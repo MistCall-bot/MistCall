@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MistCall - 调试版 v2</title>
+    <title>MistCall - 稳定版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
@@ -28,7 +28,7 @@
 
     <div id="splash-screen" onclick="enterApp()">
         <div class="splash-title">MistCall</div>
-        <div style="margin-top:15px; color:rgba(142,158,171,0.5)">点击屏幕开始 (v2)</div>
+        <div style="margin-top:15px; color:rgba(142,158,171,0.5)">点击屏幕开始</div>
     </div>
 
     <div id="main-app">
@@ -58,6 +58,15 @@
                     <p id="msg" style="font-size: 0.75rem; margin-top: 8px; color: #ff4d4f;"></p>
                 </div>
             </div>
+            
+            <div class="card">
+                <h3 style="font-size: 1.1rem; color: #333;">创作者分成计划</h3>
+                <p style="font-size: 0.85rem; color: #666; line-height: 1.6; margin-top: 10px;">
+                    • 玩家使用公开智能体需支付 1 Mist币<br>
+                    • 作者可获得 0.4 Mist钻 (1钻=1元)<br>
+                    • 收益满 10 钻即可申请提现
+                </p>
+            </div>
         </div>
     </div>
 
@@ -79,7 +88,7 @@
         }
 
         async function loadUserData() {
-            const { data } = await _supabase.from('profiles').select('*').eq('id', currentUserId).single();
+            const { data } = await _supabase.from('profiles').select('*').eq('id', currentUserId).maybeSingle();
             if (data) {
                 document.getElementById('coin-balance').innerText = data.mist_coin || 0;
                 document.getElementById('diamond-balance').innerText = Number(data.mist_diamond || 0).toFixed(2);
@@ -92,48 +101,41 @@
             if (!code) return;
 
             msg.innerText = "正在核对卡密...";
-            console.log("开始兑换，卡密是:", code);
 
             try {
-                // 第一步：去数据库搜卡密
+                // 使用 maybeSingle() 替代 single()，防止找不到数据时报错
                 const { data: cdk, error: cdkErr } = await _supabase
                     .from('cdk_keys')
                     .select('*')
                     .eq('key_code', code)
                     .eq('is_used', false)
-                    .single();
+                    .maybeSingle();
 
                 if (cdkErr) {
-                    alert("第一步(查询)出错: " + cdkErr.message);
-                    msg.innerText = "查询出错";
+                    alert("查询出错: " + cdkErr.message);
                     return;
                 }
 
                 if (!cdk) {
-                    alert("没找到该卡密，或者已被使用");
-                    msg.innerText = "卡密无效";
+                    msg.innerText = "错误：卡密无效、已被使用或输入有误";
                     return;
                 }
 
-                // 第二步：获取余额
-                const { data: profile, error: pErr } = await _supabase.from('profiles').select('mist_coin').eq('id', currentUserId).single();
-                if (pErr) { alert("第二步(取余额)出错: " + pErr.message); return; }
-
+                // 获取余额
+                const { data: profile } = await _supabase.from('profiles').select('mist_coin').eq('id', currentUserId).maybeSingle();
                 const newBalance = (profile.mist_coin || 0) + cdk.coin_amount;
 
-                // 第三步：更新余额
-                const { error: upErr } = await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
-                if (upErr) { alert("第三步(加钱)出错: " + upErr.message); return; }
+                // 更新
+                await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
+                await _supabase.from('cdk_keys').update({ is_used: true, used_by: currentUserId }).eq('key_code', code);
 
-                // 第四步：销毁卡密
-                const { error: usedErr } = await _supabase.from('cdk_keys').update({ is_used: true, used_by: currentUserId }).eq('key_code', code);
-                if (usedErr) { alert("第四步(销毁卡密)出错: " + usedErr.message); return; }
-
-                alert("恭喜！充值成功，到账 " + cdk.coin_amount + " 币");
+                alert("兑换成功！已到账 " + cdk.coin_amount + " Mist币");
+                msg.style.color = "green";
                 msg.innerText = "兑换成功！";
+                document.getElementById('cdk-input').value = "";
                 loadUserData();
-            } catch (err) {
-                alert("发生未知系统错误: " + err.message);
+            } catch (e) {
+                alert("系统错误: " + e.message);
             }
         }
     </script>
