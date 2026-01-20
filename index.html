@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MistCall</title>
+    <title>MistCall - 调试版 v2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
         body, html { width: 100%; height: 100%; overflow: hidden; background-color: #f0f2f5; }
-        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.8s ease; cursor: pointer; }
+        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.8s ease; }
         .splash-title { font-family: "Didot", serif; font-size: 3.8rem; font-weight: bold; font-style: italic; background: linear-gradient(110deg, #8e9eab 20%, #ffffff 45%, #a1c4fd 50%, #fbc2eb 55%, #8e9eab 80%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shineRight 4.5s linear infinite; }
         @keyframes shineRight { 0% { background-position: -100% center; } 100% { background-position: 200% center; } }
         #main-app { opacity: 0; transition: opacity 1s ease; height: 100%; display: flex; flex-direction: column; visibility: hidden; }
@@ -28,7 +28,7 @@
 
     <div id="splash-screen" onclick="enterApp()">
         <div class="splash-title">MistCall</div>
-        <div style="margin-top:15px; color:rgba(142,158,171,0.5)">点击屏幕开始</div>
+        <div style="margin-top:15px; color:rgba(142,158,171,0.5)">点击屏幕开始 (v2)</div>
     </div>
 
     <div id="main-app">
@@ -41,11 +41,11 @@
             <div class="card">
                 <div class="wallet-info">
                     <div class="wallet-item">
-                        <div class="wallet-label">Mist币 (余额)</div>
+                        <div class="wallet-label">Mist币</div>
                         <div id="coin-balance" class="wallet-value">0</div>
                     </div>
                     <div class="wallet-item">
-                        <div class="wallet-label">Mist钻 (收益)</div>
+                        <div class="wallet-label">Mist钻</div>
                         <div id="diamond-balance" class="wallet-value">0.00</div>
                     </div>
                 </div>
@@ -79,13 +79,11 @@
         }
 
         async function loadUserData() {
-            try {
-                const { data, error } = await _supabase.from('profiles').select('*').eq('id', currentUserId).single();
-                if (data) {
-                    document.getElementById('coin-balance').innerText = data.mist_coin || 0;
-                    document.getElementById('diamond-balance').innerText = Number(data.mist_diamond || 0).toFixed(2);
-                }
-            } catch (e) { console.log(e); }
+            const { data } = await _supabase.from('profiles').select('*').eq('id', currentUserId).single();
+            if (data) {
+                document.getElementById('coin-balance').innerText = data.mist_coin || 0;
+                document.getElementById('diamond-balance').innerText = Number(data.mist_diamond || 0).toFixed(2);
+            }
         }
 
         async function handleRedeem() {
@@ -94,40 +92,49 @@
             if (!code) return;
 
             msg.innerText = "正在核对卡密...";
+            console.log("开始兑换，卡密是:", code);
 
-            // 1. 查找卡密 (增加错误捕捉)
-            const { data: cdk, error: cdkErr } = await _supabase
-                .from('cdk_keys')
-                .select('*')
-                .eq('key_code', code)
-                .eq('is_used', false)
-                .single();
+            try {
+                // 第一步：去数据库搜卡密
+                const { data: cdk, error: cdkErr } = await _supabase
+                    .from('cdk_keys')
+                    .select('*')
+                    .eq('key_code', code)
+                    .eq('is_used', false)
+                    .single();
 
-            if (cdkErr) {
-                alert("数据库连接失败: " + cdkErr.message);
-                msg.innerText = "兑换失败，请重试";
-                return;
+                if (cdkErr) {
+                    alert("第一步(查询)出错: " + cdkErr.message);
+                    msg.innerText = "查询出错";
+                    return;
+                }
+
+                if (!cdk) {
+                    alert("没找到该卡密，或者已被使用");
+                    msg.innerText = "卡密无效";
+                    return;
+                }
+
+                // 第二步：获取余额
+                const { data: profile, error: pErr } = await _supabase.from('profiles').select('mist_coin').eq('id', currentUserId).single();
+                if (pErr) { alert("第二步(取余额)出错: " + pErr.message); return; }
+
+                const newBalance = (profile.mist_coin || 0) + cdk.coin_amount;
+
+                // 第三步：更新余额
+                const { error: upErr } = await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
+                if (upErr) { alert("第三步(加钱)出错: " + upErr.message); return; }
+
+                // 第四步：销毁卡密
+                const { error: usedErr } = await _supabase.from('cdk_keys').update({ is_used: true, used_by: currentUserId }).eq('key_code', code);
+                if (usedErr) { alert("第四步(销毁卡密)出错: " + usedErr.message); return; }
+
+                alert("恭喜！充值成功，到账 " + cdk.coin_amount + " 币");
+                msg.innerText = "兑换成功！";
+                loadUserData();
+            } catch (err) {
+                alert("发生未知系统错误: " + err.message);
             }
-
-            if (!cdk) {
-                msg.innerText = "错误：卡密无效或已被使用";
-                return;
-            }
-
-            // 2. 增加余额
-            const { data: profile } = await _supabase.from('profiles').select('mist_coin').eq('id', currentUserId).single();
-            const newBalance = (profile.mist_coin || 0) + cdk.coin_amount;
-
-            await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
-            
-            // 3. 销毁卡密
-            await _supabase.from('cdk_keys').update({ is_used: true, used_by: currentUserId }).eq('key_code', code);
-
-            alert("充值成功！到账 " + cdk.coin_amount + " 币");
-            msg.style.color = "green";
-            msg.innerText = "兑换成功！";
-            document.getElementById('cdk-input').value = "";
-            loadUserData();
         }
     </script>
 </body>
