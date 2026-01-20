@@ -4,42 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MistCall</title>
-    <!-- 引入 Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
         body, html { width: 100%; height: 100%; overflow: hidden; background-color: #f0f2f5; }
-        
-        /* 开机动画 */
         #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.8s ease; cursor: pointer; }
         .splash-title { font-family: "Didot", serif; font-size: 3.8rem; font-weight: bold; font-style: italic; background: linear-gradient(110deg, #8e9eab 20%, #ffffff 45%, #a1c4fd 50%, #fbc2eb 55%, #8e9eab 80%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shineRight 4.5s linear infinite; }
         @keyframes shineRight { 0% { background-position: -100% center; } 100% { background-position: 200% center; } }
-        
-        /* 主界面 */
         #main-app { opacity: 0; transition: opacity 1s ease; height: 100%; display: flex; flex-direction: column; visibility: hidden; }
         .header { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid rgba(0,0,0,0.05); background: rgba(255,255,255,0.6); backdrop-filter: blur(10px); }
         .content { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
         .card { background: #fff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
-        
-        /* 钱包样式 */
         .wallet-info { display: flex; justify-content: space-around; text-align: center; }
         .wallet-label { font-size: 0.8rem; color: #999; }
         .wallet-value { font-size: 1.2rem; font-weight: bold; color: #5B86E5; }
         .recharge-box { margin-top: 15px; border-top: 1px dashed #eee; padding-top: 15px; }
         .input-group { display: flex; gap: 8px; margin-top: 10px; }
         input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
-        button { padding: 10px 15px; background: #5B86E5; color: white; border: none; border-radius: 8px; font-size: 0.9rem; }
+        button { padding: 10px 15px; background: #5B86E5; color: white; border: none; border-radius: 8px; }
     </style>
 </head>
 <body>
 
-    <!-- 开机封面 -->
     <div id="splash-screen" onclick="enterApp()">
         <div class="splash-title">MistCall</div>
         <div style="margin-top:15px; color:rgba(142,158,171,0.5)">点击屏幕开始</div>
     </div>
 
-    <!-- 主应用 -->
     <div id="main-app">
         <header class="header">
             <div class="header-title">我的钱包</div>
@@ -58,39 +49,26 @@
                         <div id="diamond-balance" class="wallet-value">0.00</div>
                     </div>
                 </div>
-                
                 <div class="recharge-box">
                     <p style="font-size: 0.85rem; color: #666;">卡密兑换</p>
                     <div class="input-group">
-                        <input type="text" id="cdk-input" placeholder="输入爱发电卡密">
+                        <input type="text" id="cdk-input" placeholder="输入卡密">
                         <button onclick="handleRedeem()">兑换</button>
                     </div>
                     <p id="msg" style="font-size: 0.75rem; margin-top: 8px; color: #ff4d4f;"></p>
                 </div>
             </div>
-
-            <div class="card">
-                <h3>创作者分成计划</h3>
-                <p style="font-size: 0.85rem; color: #666; line-height: 1.6; margin-top: 10px;">
-                    • 玩家使用公开智能体需支付 1 Mist币<br>
-                    • 作者可获得 0.4 Mist钻 (1钻=1元)<br>
-                    • 收益满 10 钻即可申请提现
-                </p>
-            </div>
         </div>
     </div>
 
     <script>
-        // 自动填入的配置信息
+        // 已经为你填好了所有信息
         const SUPABASE_URL = 'https://cbxtlwjpbmuniexcuzrp.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_Bsfqqe6VtGO_yFth6JyDLw_-SA4V3EM';
+        const currentUserId = 'b536331d-a313-45a1-baeb-09bded28af5e';
 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        // 你的测试玩家ID
-        let currentUserId = 'b536331d-a313-45a1-baeb-09bded28af5e';;
 
-        // 进入应用
         async function enterApp() {
             document.getElementById('splash-screen').style.opacity = '0';
             setTimeout(() => {
@@ -101,55 +79,50 @@
             }, 800);
         }
 
-        // 加载余额
         async function loadUserData() {
+            // 注意这里改成了 uid_display，和你数据库一致
             const { data, error } = await _supabase
                 .from('profiles')
-                .select('id_display, mist_coin, mist_diamond')
+                .select('uid_display, mist_coin, mist_diamond')
                 .eq('id', currentUserId)
                 .single();
 
             if (data) {
-                document.getElementById('user-display-id').innerText = 'ID: ' + data.id_display;
+                document.getElementById('user-display-id').innerText = 'ID: ' + data.uid_display;
                 document.getElementById('coin-balance').innerText = data.mist_coin || 0;
                 document.getElementById('diamond-balance').innerText = (data.mist_diamond || 0).toFixed(2);
+            } else {
+                console.error("加载失败:", error);
             }
         }
 
-        // 兑换卡密
         async function handleRedeem() {
             const code = document.getElementById('cdk-input').value.trim();
             const msg = document.getElementById('msg');
             if (!code) return;
 
-            msg.style.color = "#666";
             msg.innerText = "正在验证...";
 
-            // 1. 查询卡密
-            const { data: cdk, error: cdkErr } = await _supabase
+            const { data: cdk } = await _supabase
                 .from('cdk_keys')
                 .select('*')
                 .eq('key_code', code)
                 .eq('is_used', false)
                 .single();
 
-            if (cdkErr || !cdk) {
-                msg.style.color = "#ff4d4f";
+            if (!cdk) {
                 msg.innerText = "错误：卡密无效或已被使用";
                 return;
             }
 
-            // 2. 获取当前余额
             const { data: profile } = await _supabase.from('profiles').select('mist_coin').eq('id', currentUserId).single();
             const newBalance = (profile.mist_coin || 0) + cdk.coin_amount;
 
-            // 3. 更新数据库
             await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
             await _supabase.from('cdk_keys').update({ is_used: true, used_by: currentUserId }).eq('key_code', code);
 
             msg.style.color = "green";
-            msg.innerText = `恭喜！成功兑换 ${cdk.coin_amount} Mist币`;
-            document.getElementById('cdk-input').value = "";
+            msg.innerText = "充值成功！";
             loadUserData();
         }
     </script>
