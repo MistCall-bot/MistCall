@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MistCall - 最终修复版</title>
+    <!-- 更换为更稳定的插件地址 -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
+    <style>
+        :root { --green: #07c160; --blue: #2a5298; --gold: #f39c12; --bg: #f2f2f2; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, sans-serif; }
+        body { background: var(--bg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .hidden { display: none !important; }
+        #cover-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #1e3c72, #2a5298); z-index: 10000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; }
+        header { height: 50px; background: #eee; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; border-bottom: 1px solid #ddd; font-weight: bold; }
+        #content-area { flex: 1; overflow-y: auto; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 5000; display: flex; justify-content: center; align-items: center; }
+        .modal-inner { background: white; width: 85%; border-radius: 15px; padding: 25px; }
+        nav { height: 60px; background: #f9f9f9; display: flex; border-top: 1px solid #ddd; }
+        .nav-item { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 11px; color: #666; }
+        .nav-item.active { color: var(--green); }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; }
+        .btn { border: none; padding: 12px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
+        .btn-blue { background: var(--blue); color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="cover-screen">
+        <h1 style="font-size: 42px; margin-bottom: 15px;">MistCall</h1>
+        <p id="status-text">正在建立云端连接...</p>
+        <button id="retry-btn" class="btn btn-blue" style="width: auto; margin-top: 20px; display: none;" onclick="location.reload()">重试加载</button>
+    </div>
+
+    <div id="auth-modal" class="modal hidden">
+        <div class="modal-inner">
+            <h2 id="auth-title">欢迎加入</h2>
+            <input type="email" id="auth-email" placeholder="邮箱地址">
+            <input type="password" id="auth-pwd" placeholder="密码">
+            <button class="btn btn-blue" onclick="handleAuth()">进入 MistCall</button>
+            <p style="text-align:center; margin-top:15px; font-size:12px; color:#888;" onclick="toggleAuthMode()">切换 登录/注册</p>
+        </div>
+    </div>
+
+    <div id="main-app" class="hidden" style="display: flex; flex-direction: column; height: 100vh;">
+        <header><span id="header-title">世界</span><span id="user-coins" style="color:var(--gold)">0</span></header>
+        <div id="content-area"><div id="page-content"></div></div>
+        <nav>
+            <div class="nav-item" onclick="switchTab('联系人', this)">👤<br>联系人</div>
+            <div class="nav-item active" onclick="switchTab('世界', this)">🌍<br>世界</div>
+            <div class="nav-item" onclick="switchTab('我', this)">⚙️<br>我</div>
+        </nav>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://cbxtlwjpbmuniexcuzrp.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNieHRsd2pwYm11bmlleGN1enJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4OTk0NDEsImV4cCI6MjA4NDQ3NTQ0MX0.GllJZ_5dQTgrrhUZ2FmuLuym-A38oWWeIJuIITLiWgU";
+        
+        let supabase;
+        let isLoginMode = false;
+
+        // 核心：每隔 0.5 秒检查一次插件是否加载好
+        const checkTimer = setInterval(() => {
+            if (window.supabase) {
+                clearInterval(checkTimer);
+                initApp();
+            }
+        }, 500);
+
+        // 如果 8 秒还没加载好，显示重试按钮
+        setTimeout(() => {
+            if (!supabase) {
+                document.getElementById('status-text').innerHTML = "网络连接较慢<br>请检查 Wi-Fi 或点击下方重试";
+                document.getElementById('retry-btn').style.display = "block";
+            }
+        }, 8000);
+
+        function initApp() {
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                document.getElementById('status-text').innerText = "已连接到云端，点击屏幕开始";
+                document.getElementById('cover-screen').onclick = checkAuth;
+            } catch (e) {
+                document.getElementById('status-text').innerText = "配置错误，请检查 URL";
+            }
+        }
+
+        async function checkAuth() {
+            if (!supabase) return;
+            const { data } = await supabase.auth.getSession();
+            if (data.session) loginSuccess(data.session.user);
+            else document.getElementById('auth-modal').classList.remove('hidden');
+        }
+
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('auth-title').innerText = isLoginMode ? "欢迎回来" : "欢迎加入";
+        }
+
+        async function handleAuth() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-pwd').value;
+            if (!email || !password) return alert("请填写完整");
+
+            let res = isLoginMode ? 
+                await supabase.auth.signInWithPassword({ email, password }) : 
+                await supabase.auth.signUp({ email, password });
+
+            if (res.error) alert(res.error.message);
+            else if (res.data.session) loginSuccess(res.data.user);
+            else alert("注册成功，请直接登录！");
+        }
+
+        async function loginSuccess(user) {
+            document.getElementById('cover-screen').classList.add('hidden');
+            document.getElementById('auth-modal').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            
+            // 获取余额
+            let { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            if (!data) {
+                const { data: newData } = await supabase.from('profiles').insert([
+                    { id: user.id, username: "新玩家", uid_display: "MC-"+Math.floor(Math.random()*100000), mist_coins: 10 }
+                ]).select().single();
+                data = newData;
+            }
+            document.getElementById('user-coins').innerText = data.mist_coins;
+            switchTab('世界', document.querySelectorAll('.nav-item')[1]);
+        }
+
+        async function switchTab(tab, el) {
+            document.getElementById('header-title').innerText = tab;
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            el.classList.add('active');
+            const content = document.getElementById('page-content');
+            if (tab === '世界') {
+                content.innerHTML = '<p style="padding:20px;">正在获取智能体...</p>';
+                const { data } = await supabase.from('agents').select('*');
+                content.innerHTML = (data || []).map(a => `
+                    <div style="background:white; margin:10px; padding:15px; border-radius:10px;">
+                        <strong>${a.name}</strong><p style="font-size:12px; color:#666;">${a.prompt}</p>
+                    </div>
+                `).join('') || '<p style="padding:20px; text-align:center;">世界空空如也</p>';
+            } else {
+                content.innerHTML = `<p style="padding:20px;">${tab}页面建设中...</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
