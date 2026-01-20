@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MistCall - 稳定版</title>
+    <title>MistCall - 最终修复版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
         body, html { width: 100%; height: 100%; overflow: hidden; background-color: #f0f2f5; }
-        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.8s ease; }
+        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.8s ease; cursor: pointer; }
         .splash-title { font-family: "Didot", serif; font-size: 3.8rem; font-weight: bold; font-style: italic; background: linear-gradient(110deg, #8e9eab 20%, #ffffff 45%, #a1c4fd 50%, #fbc2eb 55%, #8e9eab 80%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shineRight 4.5s linear infinite; }
         @keyframes shineRight { 0% { background-position: -100% center; } 100% { background-position: 200% center; } }
         #main-app { opacity: 0; transition: opacity 1s ease; height: 100%; display: flex; flex-direction: column; visibility: hidden; }
@@ -53,7 +53,7 @@
                     <p style="font-size: 0.85rem; color: #666;">卡密兑换</p>
                     <div class="input-group">
                         <input type="text" id="cdk-input" placeholder="输入卡密">
-                        <button onclick="handleRedeem()">兑换</button>
+                        <button id="redeem-btn" onclick="handleRedeem()">兑换</button>
                     </div>
                     <p id="msg" style="font-size: 0.75rem; margin-top: 8px; color: #ff4d4f;"></p>
                 </div>
@@ -64,7 +64,7 @@
                 <p style="font-size: 0.85rem; color: #666; line-height: 1.6; margin-top: 10px;">
                     • 玩家使用公开智能体需支付 1 Mist币<br>
                     • 作者可获得 0.4 Mist钻 (1钻=1元)<br>
-                    • 收益满 10 钻即可申请提现
+                    • 收益满 10 钻即可通过邮件申请提现
                 </p>
             </div>
         </div>
@@ -88,54 +88,68 @@
         }
 
         async function loadUserData() {
-            const { data } = await _supabase.from('profiles').select('*').eq('id', currentUserId).maybeSingle();
-            if (data) {
-                document.getElementById('coin-balance').innerText = data.mist_coin || 0;
-                document.getElementById('diamond-balance').innerText = Number(data.mist_diamond || 0).toFixed(2);
-            }
+            try {
+                const { data } = await _supabase.from('profiles').select('*').eq('id', currentUserId).maybeSingle();
+                if (data) {
+                    document.getElementById('coin-balance').innerText = data.mist_coin || 0;
+                    document.getElementById('diamond-balance').innerText = Number(data.mist_diamond || 0).toFixed(2);
+                }
+            } catch (e) { console.error(e); }
         }
 
         async function handleRedeem() {
-            const code = document.getElementById('cdk-input').value.trim();
+            const inputField = document.getElementById('cdk-input');
+            const code = inputField.value.trim();
             const msg = document.getElementById('msg');
+            const btn = document.getElementById('redeem-btn');
+
             if (!code) return;
 
+            msg.style.color = "#666";
             msg.innerText = "正在核对卡密...";
+            btn.disabled = true;
 
             try {
-                // 使用 maybeSingle() 替代 single()，防止找不到数据时报错
+                // 1. 查找卡密 (不查 is_used，拿到数据后再判断，更稳定)
                 const { data: cdk, error: cdkErr } = await _supabase
                     .from('cdk_keys')
                     .select('*')
                     .eq('key_code', code)
-                    .eq('is_used', false)
                     .maybeSingle();
 
                 if (cdkErr) {
-                    alert("查询出错: " + cdkErr.message);
+                    alert("连接数据库失败: " + cdkErr.message);
+                    btn.disabled = false;
                     return;
                 }
 
-                if (!cdk) {
-                    msg.innerText = "错误：卡密无效、已被使用或输入有误";
+                if (!cdk || cdk.is_used === true) {
+                    msg.style.color = "#ff4d4f";
+                    msg.innerText = "错误：卡密无效或已被使用";
+                    btn.disabled = false;
                     return;
                 }
 
-                // 获取余额
+                // 2. 获取玩家余额
                 const { data: profile } = await _supabase.from('profiles').select('mist_coin').eq('id', currentUserId).maybeSingle();
-                const newBalance = (profile.mist_coin || 0) + cdk.coin_amount;
+                const newBalance = (profile ? (profile.mist_coin || 0) : 0) + (cdk.coin_amount || 0);
 
-                // 更新
-                await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
+                // 3. 更新余额
+                const { error: upErr } = await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
+                if (upErr) { alert("增加余额失败: " + upErr.message); btn.disabled = false; return; }
+                
+                // 4. 销毁卡密
                 await _supabase.from('cdk_keys').update({ is_used: true, used_by: currentUserId }).eq('key_code', code);
 
-                alert("兑换成功！已到账 " + cdk.coin_amount + " Mist币");
+                alert("🎉 充值成功！到账 " + cdk.coin_amount + " Mist币");
                 msg.style.color = "green";
                 msg.innerText = "兑换成功！";
-                document.getElementById('cdk-input').value = "";
+                inputField.value = "";
                 loadUserData();
             } catch (e) {
-                alert("系统错误: " + e.message);
+                alert("系统发生意外错误: " + e.message);
+            } finally {
+                btn.disabled = false;
             }
         }
     </script>
