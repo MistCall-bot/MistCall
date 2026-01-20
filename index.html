@@ -22,7 +22,6 @@
         .input-group { display: flex; gap: 8px; margin-top: 10px; }
         input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
         button { padding: 10px 15px; background: #5B86E5; color: white; border: none; border-radius: 8px; }
-        #debug-log { font-size: 10px; color: red; padding: 10px; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -39,6 +38,7 @@
         </header>
 
         <div class="content">
+            <!-- 钱包 -->
             <div class="card">
                 <div class="wallet-info">
                     <div class="wallet-item">
@@ -53,14 +53,22 @@
                 <div class="recharge-box">
                     <p style="font-size: 0.85rem; color: #666;">卡密兑换</p>
                     <div class="input-group">
-                        <input type="text" id="cdk-input" placeholder="输入卡密">
+                        <input type="text" id="cdk-input" placeholder="输入爱发电卡密">
                         <button onclick="handleRedeem()">兑换</button>
                     </div>
                     <p id="msg" style="font-size: 0.75rem; margin-top: 8px; color: #ff4d4f;"></p>
                 </div>
             </div>
-            <!-- 错误日志显示区 -->
-            <div id="debug-log"></div>
+
+            <!-- 分成计划文字 -->
+            <div class="card">
+                <h3 style="font-size: 1.1rem; color: #333;">创作者分成计划</h3>
+                <p style="font-size: 0.85rem; color: #666; line-height: 1.6; margin-top: 10px;">
+                    • 玩家使用公开智能体需支付 1 Mist币<br>
+                    • 作者可获得 0.4 Mist钻 (1钻=1元)<br>
+                    • 收益满 10 钻即可通过邮件申请提现
+                </p>
+            </div>
         </div>
     </div>
 
@@ -70,10 +78,6 @@
         const currentUserId = 'b536331d-a313-45a1-baeb-09bded28af5e';
 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        function logError(err) {
-            document.getElementById('debug-log').innerText = "系统提示: " + err;
-        }
 
         async function enterApp() {
             document.getElementById('splash-screen').style.opacity = '0';
@@ -86,24 +90,13 @@
         }
 
         async function loadUserData() {
-            // 使用 select('*') 避免因为缺少某个列而崩溃
-            const { data, error } = await _supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', currentUserId)
-                .single();
-
-            if (error) {
-                logError("加载失败: " + error.message);
-                return;
-            }
-
+            const { data } = await _supabase.from('profiles').select('*').eq('id', currentUserId).single();
             if (data) {
-                // 自动适配你的列名 uid_display
                 document.getElementById('user-display-id').innerText = 'ID: ' + (data.uid_display || '未知');
                 document.getElementById('coin-balance').innerText = data.mist_coin || 0;
-                // 如果没有钻石列，就显示 0.00
-                document.getElementById('diamond-balance').innerText = data.mist_diamond ? data.mist_diamond.toFixed(2) : "0.00";
+                // 容错处理：如果数据库还没水晶列，显示0
+                let diamond = data.mist_diamond || 0;
+                document.getElementById('diamond-balance').innerText = Number(diamond).toFixed(2);
             }
         }
 
@@ -112,8 +105,10 @@
             const msg = document.getElementById('msg');
             if (!code) return;
 
-            msg.innerText = "正在验证...";
+            msg.style.color = "#666";
+            msg.innerText = "正在核对卡密...";
 
+            // 1. 查找卡密
             const { data: cdk, error: cdkErr } = await _supabase
                 .from('cdk_keys')
                 .select('*')
@@ -122,20 +117,23 @@
                 .single();
 
             if (cdkErr || !cdk) {
+                msg.style.color = "#ff4d4f";
                 msg.innerText = "错误：卡密无效或已被使用";
                 return;
             }
 
-            const { data: profile } = await _supabase.from('profiles').select('*').eq('id', currentUserId).single();
+            // 2. 增加余额
+            const { data: profile } = await _supabase.from('profiles').select('mist_coin').eq('id', currentUserId).single();
             const newBalance = (profile.mist_coin || 0) + cdk.coin_amount;
 
-            const { error: upErr } = await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
-            if(upErr) { logError("更新余额失败: " + upErr.message); return; }
-
+            await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
+            
+            // 3. 销毁卡密
             await _supabase.from('cdk_keys').update({ is_used: true, used_by: currentUserId }).eq('key_code', code);
 
             msg.style.color = "green";
-            msg.innerText = "充值成功！";
+            msg.innerText = `兑换成功！已到账 ${cdk.coin_amount} Mist币`;
+            document.getElementById('cdk-input').value = "";
             loadUserData();
         }
     </script>
