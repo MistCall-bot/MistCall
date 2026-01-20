@@ -22,6 +22,7 @@
         .input-group { display: flex; gap: 8px; margin-top: 10px; }
         input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
         button { padding: 10px 15px; background: #5B86E5; color: white; border: none; border-radius: 8px; }
+        #debug-log { font-size: 10px; color: red; padding: 10px; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -58,16 +59,21 @@
                     <p id="msg" style="font-size: 0.75rem; margin-top: 8px; color: #ff4d4f;"></p>
                 </div>
             </div>
+            <!-- 错误日志显示区 -->
+            <div id="debug-log"></div>
         </div>
     </div>
 
     <script>
-        // 已经为你填好了所有信息
         const SUPABASE_URL = 'https://cbxtlwjpbmuniexcuzrp.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_Bsfqqe6VtGO_yFth6JyDLw_-SA4V3EM';
         const currentUserId = 'b536331d-a313-45a1-baeb-09bded28af5e';
 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function logError(err) {
+            document.getElementById('debug-log').innerText = "系统提示: " + err;
+        }
 
         async function enterApp() {
             document.getElementById('splash-screen').style.opacity = '0';
@@ -80,19 +86,24 @@
         }
 
         async function loadUserData() {
-            // 注意这里改成了 uid_display，和你数据库一致
+            // 使用 select('*') 避免因为缺少某个列而崩溃
             const { data, error } = await _supabase
                 .from('profiles')
-                .select('uid_display, mist_coin, mist_diamond')
+                .select('*')
                 .eq('id', currentUserId)
                 .single();
 
+            if (error) {
+                logError("加载失败: " + error.message);
+                return;
+            }
+
             if (data) {
-                document.getElementById('user-display-id').innerText = 'ID: ' + data.uid_display;
+                // 自动适配你的列名 uid_display
+                document.getElementById('user-display-id').innerText = 'ID: ' + (data.uid_display || '未知');
                 document.getElementById('coin-balance').innerText = data.mist_coin || 0;
-                document.getElementById('diamond-balance').innerText = (data.mist_diamond || 0).toFixed(2);
-            } else {
-                console.error("加载失败:", error);
+                // 如果没有钻石列，就显示 0.00
+                document.getElementById('diamond-balance').innerText = data.mist_diamond ? data.mist_diamond.toFixed(2) : "0.00";
             }
         }
 
@@ -103,22 +114,24 @@
 
             msg.innerText = "正在验证...";
 
-            const { data: cdk } = await _supabase
+            const { data: cdk, error: cdkErr } = await _supabase
                 .from('cdk_keys')
                 .select('*')
                 .eq('key_code', code)
                 .eq('is_used', false)
                 .single();
 
-            if (!cdk) {
+            if (cdkErr || !cdk) {
                 msg.innerText = "错误：卡密无效或已被使用";
                 return;
             }
 
-            const { data: profile } = await _supabase.from('profiles').select('mist_coin').eq('id', currentUserId).single();
+            const { data: profile } = await _supabase.from('profiles').select('*').eq('id', currentUserId).single();
             const newBalance = (profile.mist_coin || 0) + cdk.coin_amount;
 
-            await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
+            const { error: upErr } = await _supabase.from('profiles').update({ mist_coin: newBalance }).eq('id', currentUserId);
+            if(upErr) { logError("更新余额失败: " + upErr.message); return; }
+
             await _supabase.from('cdk_keys').update({ is_used: true, used_by: currentUserId }).eq('key_code', code);
 
             msg.style.color = "green";
