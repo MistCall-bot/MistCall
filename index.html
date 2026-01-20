@@ -3,146 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MistCall - 最终修复版</title>
-    <!-- 更换为更稳定的插件地址 -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
+    <title>MistCall 调试版</title>
+    <!-- 换成 jsDelivr 的国内镜像加速地址 -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/supabase/2.39.7/supabase.js"></script>
     <style>
-        :root { --green: #07c160; --blue: #2a5298; --gold: #f39c12; --bg: #f2f2f2; }
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, sans-serif; }
-        body { background: var(--bg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        body { margin: 0; background: #1e3c72; color: white; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         .hidden { display: none !important; }
-        #cover-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #1e3c72, #2a5298); z-index: 10000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; }
-        header { height: 50px; background: #eee; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; border-bottom: 1px solid #ddd; font-weight: bold; }
-        #content-area { flex: 1; overflow-y: auto; }
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 5000; display: flex; justify-content: center; align-items: center; }
-        .modal-inner { background: white; width: 85%; border-radius: 15px; padding: 25px; }
-        nav { height: 60px; background: #f9f9f9; display: flex; border-top: 1px solid #ddd; }
-        .nav-item { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 11px; color: #666; }
-        .nav-item.active { color: var(--green); }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; }
-        .btn { border: none; padding: 12px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
-        .btn-blue { background: var(--blue); color: white; }
+        .modal { position: fixed; inset: 0; background: white; color: #333; padding: 20px; z-index: 1000; display: flex; flex-direction: column; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        button { background: #2a5298; color: white; border: none; padding: 15px; border-radius: 8px; font-size: 18px; width: 100%; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="cover-screen">
-        <h1 style="font-size: 42px; margin-bottom: 15px;">MistCall</h1>
-        <p id="status-text">正在建立云端连接...</p>
-        <button id="retry-btn" class="btn btn-blue" style="width: auto; margin-top: 20px; display: none;" onclick="location.reload()">重试加载</button>
+    <div id="cover" onclick="forceStart()">
+        <h1 style="font-size: 50px;">MistCall</h1>
+        <p id="status">正在加载插件...</p>
+        <p style="font-size: 12px; opacity: 0.5;">(如果点不动，请刷新网页)</p>
     </div>
 
-    <div id="auth-modal" class="modal hidden">
-        <div class="modal-inner">
-            <h2 id="auth-title">欢迎加入</h2>
-            <input type="email" id="auth-email" placeholder="邮箱地址">
-            <input type="password" id="auth-pwd" placeholder="密码">
-            <button class="btn btn-blue" onclick="handleAuth()">进入 MistCall</button>
-            <p style="text-align:center; margin-top:15px; font-size:12px; color:#888;" onclick="toggleAuthMode()">切换 登录/注册</p>
+    <!-- 简易登录窗口 -->
+    <div id="auth-box" class="modal hidden">
+        <h2>欢迎加入</h2>
+        <input type="email" id="email" placeholder="输入邮箱">
+        <input type="password" id="pwd" placeholder="输入密码">
+        <button onclick="doAuth()">立即进入</button>
+        <p id="auth-msg" style="font-size: 12px; color: red;"></p>
+        <button style="background:#ccc; margin-top:20px;" onclick="location.reload()">返回封面</button>
+    </div>
+
+    <!-- 简易主页 -->
+    <div id="main-page" class="modal hidden">
+        <h2 style="color:green">登录成功！</h2>
+        <div id="user-info" style="padding: 20px; border: 1px solid #eee; margin-top: 20px;">
+            正在获取你的云端余额...
         </div>
-    </div>
-
-    <div id="main-app" class="hidden" style="display: flex; flex-direction: column; height: 100vh;">
-        <header><span id="header-title">世界</span><span id="user-coins" style="color:var(--gold)">0</span></header>
-        <div id="content-area"><div id="page-content"></div></div>
-        <nav>
-            <div class="nav-item" onclick="switchTab('联系人', this)">👤<br>联系人</div>
-            <div class="nav-item active" onclick="switchTab('世界', this)">🌍<br>世界</div>
-            <div class="nav-item" onclick="switchTab('我', this)">⚙️<br>我</div>
-        </nav>
+        <button style="margin-top:20px;" onclick="location.reload()">退出登录</button>
     </div>
 
     <script>
-        const SUPABASE_URL = "https://cbxtlwjpbmuniexcuzrp.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNieHRsd2pwYm11bmlleGN1enJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4OTk0NDEsImV4cCI6MjA4NDQ3NTQ0MX0.GllJZ_5dQTgrrhUZ2FmuLuym-A38oWWeIJuIITLiWgU";
+        const URL = "https://cbxtlwjpbmuniexcuzrp.supabase.co";
+        const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNieHRsd2pwYm11bmlleGN1enJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4OTk0NDEsImV4cCI6MjA4NDQ3NTQ0MX0.GllJZ_5dQTgrrhUZ2FmuLuym-A38oWWeIJuIITLiWgU";
         
         let supabase;
-        let isLoginMode = false;
 
-        // 核心：每隔 0.5 秒检查一次插件是否加载好
-        const checkTimer = setInterval(() => {
+        // 1. 检查插件
+        const check = setInterval(() => {
             if (window.supabase) {
-                clearInterval(checkTimer);
-                initApp();
+                clearInterval(check);
+                try {
+                    supabase = window.supabase.createClient(URL, KEY);
+                    document.getElementById('status').innerText = "✅ 连接成功！点我进入";
+                } catch(e) {
+                    alert("配置有误: " + e.message);
+                }
             }
         }, 500);
 
-        // 如果 8 秒还没加载好，显示重试按钮
-        setTimeout(() => {
+        // 2. 暴力启动
+        function forceStart() {
+            // 只要点了，不管联网没，先给个弹窗
             if (!supabase) {
-                document.getElementById('status-text').innerHTML = "网络连接较慢<br>请检查 Wi-Fi 或点击下方重试";
-                document.getElementById('retry-btn').style.display = "block";
+                alert("插件还没加载好，请再等几秒或者检查网络！");
+                return;
             }
-        }, 8000);
-
-        function initApp() {
-            try {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                document.getElementById('status-text').innerText = "已连接到云端，点击屏幕开始";
-                document.getElementById('cover-screen').onclick = checkAuth;
-            } catch (e) {
-                document.getElementById('status-text').innerText = "配置错误，请检查 URL";
-            }
+            document.getElementById('auth-box').classList.remove('hidden');
         }
 
-        async function checkAuth() {
-            if (!supabase) return;
-            const { data } = await supabase.auth.getSession();
-            if (data.session) loginSuccess(data.session.user);
-            else document.getElementById('auth-modal').classList.remove('hidden');
-        }
+        // 3. 登录逻辑
+        async function doAuth() {
+            const email = document.getElementById('email').value;
+            const pwd = document.getElementById('pwd').value;
+            const msg = document.getElementById('auth-msg');
 
-        function toggleAuthMode() {
-            isLoginMode = !isLoginMode;
-            document.getElementById('auth-title').innerText = isLoginMode ? "欢迎回来" : "欢迎加入";
-        }
-
-        async function handleAuth() {
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-pwd').value;
-            if (!email || !password) return alert("请填写完整");
-
-            let res = isLoginMode ? 
-                await supabase.auth.signInWithPassword({ email, password }) : 
-                await supabase.auth.signUp({ email, password });
-
-            if (res.error) alert(res.error.message);
-            else if (res.data.session) loginSuccess(res.data.user);
-            else alert("注册成功，请直接登录！");
-        }
-
-        async function loginSuccess(user) {
-            document.getElementById('cover-screen').classList.add('hidden');
-            document.getElementById('auth-modal').classList.add('hidden');
-            document.getElementById('main-app').classList.remove('hidden');
+            if (!email || !pwd) { alert("请填写完整"); return; }
             
-            // 获取余额
-            let { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-            if (!data) {
-                const { data: newData } = await supabase.from('profiles').insert([
-                    { id: user.id, username: "新玩家", uid_display: "MC-"+Math.floor(Math.random()*100000), mist_coins: 10 }
-                ]).select().single();
-                data = newData;
+            msg.innerText = "正在联网验证，请稍后...";
+
+            try {
+                // 尝试注册
+                let { data, error } = await supabase.auth.signUp({ email: email, password: pwd });
+                
+                // 如果报错（可能是已注册），就尝试登录
+                if (error) {
+                    let login = await supabase.auth.signInWithPassword({ email: email, password: pwd });
+                    if (login.error) {
+                        msg.innerText = "错误: " + login.error.message;
+                        return;
+                    }
+                    data = login.data;
+                }
+
+                if (data.session) {
+                    showMain(data.user);
+                } else {
+                    msg.innerText = "注册成功，请再次点击进入。";
+                }
+            } catch (e) {
+                alert("发生异常: " + e.message);
             }
-            document.getElementById('user-coins').innerText = data.mist_coins;
-            switchTab('世界', document.querySelectorAll('.nav-item')[1]);
         }
 
-        async function switchTab(tab, el) {
-            document.getElementById('header-title').innerText = tab;
-            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            el.classList.add('active');
-            const content = document.getElementById('page-content');
-            if (tab === '世界') {
-                content.innerHTML = '<p style="padding:20px;">正在获取智能体...</p>';
-                const { data } = await supabase.from('agents').select('*');
-                content.innerHTML = (data || []).map(a => `
-                    <div style="background:white; margin:10px; padding:15px; border-radius:10px;">
-                        <strong>${a.name}</strong><p style="font-size:12px; color:#666;">${a.prompt}</p>
-                    </div>
-                `).join('') || '<p style="padding:20px; text-align:center;">世界空空如也</p>';
+        async function showMain(user) {
+            document.getElementById('auth-box').classList.add('hidden');
+            document.getElementById('main-page').classList.remove('hidden');
+            
+            // 查云端余额
+            const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            if (data) {
+                document.getElementById('user-info').innerHTML = `
+                    <p>你的名字: ${data.username}</p>
+                    <p>你的UID: ${data.uid_display}</p>
+                    <p style="font-size: 24px; color: gold;">余额: ${data.mist_coins} 币</p>
+                `;
             } else {
-                content.innerHTML = `<p style="padding:20px;">${tab}页面建设中...</p>`;
+                document.getElementById('user-info').innerText = "首次登录，正在为你生成初始余额...";
+                location.reload(); // 简单处理：重新加载即可触发 profile 创建
             }
         }
     </script>
