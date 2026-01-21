@@ -3,167 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MistCall - 兑换系统</title>
-    <!-- 引入 Supabase SDK -->
+    <title>MistCall</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* =================全局重置================= */
+        /* ================= 保留你原有的 UI 样式 ================= */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
         body, html { width: 100%; height: 100%; overflow: hidden; background-color: #f0f2f5; }
-
-        /* =================开机动画层 (Splash)================= */
-        #splash-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            transition: opacity 0.8s ease;
-            cursor: pointer;
-        }
-
-        .splash-title {
-            font-family: "Didot", "Bodoni MT", "Times New Roman", serif;
-            font-size: 3.8rem;
-            font-weight: bold;
-            font-style: italic;
-            letter-spacing: -1px;
-            background: linear-gradient(110deg, #8e9eab 20%, #ffffff 45%, #a1c4fd 50%, #fbc2eb 55%, #8e9eab 80%);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            animation: shineRight 4.5s linear infinite;
-        }
-
-        .splash-slogan {
-            font-family: "Snell Roundhand", "Brush Script MT", "Segoe Script", cursive;
-            margin-top: 15px;
-            font-size: 1.2rem;
-            color: rgba(142, 158, 171, 0.5); 
-            font-weight: normal;
-            letter-spacing: 1px;
-        }
-
-        .tap-hint {
-            position: absolute;
-            bottom: 60px;
-            font-size: 0.9rem;
-            color: #7a8b99; 
-            letter-spacing: 2px;
-            opacity: 0.8;
-            animation: breathe 3s ease-in-out infinite;
-        }
-
-        @keyframes shineRight {
-            0% { background-position: -100% center; }
-            100% { background-position: 200% center; }
-        }
-
-        @keyframes breathe {
-            0%, 100% { opacity: 0.6; }
-            50% { opacity: 1; }
-        }
-
+        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.8s ease; cursor: pointer; }
+        .splash-title { font-family: "Didot", "Bodoni MT", "Times New Roman", serif; font-size: 3.8rem; font-weight: bold; font-style: italic; letter-spacing: -1px; background: linear-gradient(110deg, #8e9eab 20%, #ffffff 45%, #a1c4fd 50%, #fbc2eb 55%, #8e9eab 80% ); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shineRight 4.5s linear infinite; }
+        .splash-slogan { font-family: "Snell Roundhand", "Brush Script MT", "Segoe Script", cursive; margin-top: 15px; font-size: 1.2rem; color: rgba(142, 158, 171, 0.5); font-weight: normal; letter-spacing: 1px; }
+        .tap-hint { position: absolute; bottom: 60px; font-size: 0.9rem; color: #7a8b99; letter-spacing: 2px; opacity: 0.8; animation: breathe 3s ease-in-out infinite; }
+        @keyframes shineRight { 0% { background-position: -100% center; } 100% { background-position: 200% center; } }
+        @keyframes breathe { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
         .hidden { opacity: 0; pointer-events: none; }
-
-        /* =================主界面================= */
         #main-app { opacity: 0; transition: opacity 1s ease; height: 100%; display: flex; flex-direction: column; }
         .header { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid rgba(0,0,0,0.05); background: rgba(255,255,255,0.6); backdrop-filter: blur(10px); }
         .header-title { font-size: 1.2rem; font-weight: 600; color: #333; }
-        
+        .balance-display { font-size: 0.85rem; color: #5B86E5; font-weight: 500; background: rgba(91, 134, 229, 0.1); padding: 4px 12px; border-radius: 20px; }
         .content { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
         .card { background: #fff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
         .card h3 { font-size: 1.1rem; margin-bottom: 8px; color: #444; }
-        .card p { font-size: 0.95rem; color: #666; line-height: 1.5; }
-
-        /* =================兑换框样式================= */
-        .redeem-section {
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
-            border: 1px solid #e0e4f0;
-        }
-        .input-group {
-            margin-top: 15px;
-            display: flex;
-            gap: 10px;
-        }
-        input[type="text"] {
-            flex: 1;
-            padding: 12px 15px;
-            border-radius: 10px;
-            border: 1px solid #ddd;
-            outline: none;
-            font-size: 1rem;
-            transition: border 0.3s;
-        }
-        input[type="text"]:focus {
-            border-color: #5B86E5;
-        }
-        .btn-redeem {
-            padding: 12px 20px;
-            background: #5B86E5;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        .btn-redeem:active {
-            background: #3a6cd9;
-            transform: scale(0.98);
-        }
-        .btn-redeem:disabled {
-            background: #ccc;
-        }
-
+        .recharge-input-group { display: flex; gap: 10px; margin-top: 12px; }
+        .recharge-input-group input { flex: 1; border: 1px solid #eee; border-radius: 10px; padding: 10px; font-size: 0.9rem; outline: none; background: #f9f9f9; }
+        .recharge-input-group button { background: #5B86E5; color: white; border: none; border-radius: 10px; padding: 0 15px; cursor: pointer; }
         .nav-bar { height: 70px; background: #fff; border-top: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-around; align-items: center; padding-bottom: 10px; }
         .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #999; font-size: 0.8rem; }
         .nav-item.active { color: #5B86E5; }
         .nav-icon { width: 24px; height: 24px; background: #eee; border-radius: 50%; }
         .nav-item.active .nav-icon { background: #5B86E5; }
-
-        /* 状态提示 */
-        #status-msg {
-            margin-top: 10px;
-            font-size: 0.85rem;
-            min-height: 1.2rem;
-        }
-        .msg-error { color: #ff4d4f; }
-        .msg-success { color: #52c41a; }
+        
+        /* 登录框专用样式 */
+        .auth-box { display: flex; flex-direction: column; gap: 10px; }
+        .auth-box input { padding: 10px; border: 1px solid #eee; border-radius: 10px; }
+        .auth-box button { padding: 10px; background: #5B86E5; color: white; border: none; border-radius: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <!-- 开机封面 -->
     <div id="splash-screen" onclick="enterApp()">
         <div class="splash-title">MistCall</div>
         <div class="splash-slogan">You are the only color in my world.</div>
         <div class="tap-hint">点击屏幕开始</div>
     </div>
 
-    <!-- 主应用界面 -->
     <div id="main-app">
         <header class="header">
             <div class="header-title">MistCall</div>
-            <div id="user-balance" style="font-size: 0.9rem; color: #5B86E5; font-weight: bold;">余额: --</div> 
+            <div id="balance-val" class="balance-display">未登录</div> 
         </header>
 
         <div class="content">
-            <!-- 兑换卡密卡片 -->
-            <div class="card redeem-section">
-                <h3>卡密兑换</h3>
-                <p>请输入您的卡密以获取金币或会员权限。</p>
-                <div class="input-group">
-                    <input type="text" id="cdk-input" placeholder="输入卡密 (如: VIP888)" spellcheck="false">
-                    <button class="btn-redeem" id="btn-submit" onclick="handleRedeem()">兑换</button>
+            <!-- 登录/账号卡片 -->
+            <div class="card" id="auth-card">
+                <h3>账号登录</h3>
+                <div class="auth-box">
+                    <input type="email" id="email-input" placeholder="请输入邮箱">
+                    <input type="password" id="password-input" placeholder="请输入密码">
+                    <button onclick="handleLogin()">登录 / 注册</button>
+                    <p style="font-size: 0.7rem; color: #999;">*新邮箱将自动创建账号</p>
                 </div>
-                <div id="status-msg"></div>
+            </div>
+
+            <!-- 充值卡片 (默认隐藏，登录后显示) -->
+            <div class="card" id="recharge-card" style="display: none;">
+                <h3>卡密充值</h3>
+                <p>输入 12 位卡密：</p>
+                <div class="recharge-input-group">
+                    <input type="text" id="cdk-input" placeholder="请输入卡密...">
+                    <button onclick="handleRedeem()">充值</button>
+                </div>
+                <button onclick="handleLogout()" style="margin-top:15px; background:none; border:none; color:#999; font-size:0.8rem; cursor:pointer;">退出登录</button>
             </div>
 
             <div class="card">
@@ -173,107 +82,79 @@
         </div>
 
         <nav class="nav-bar">
-            <div class="nav-item active">
-                <div class="nav-icon"></div>
-                <span>通话</span>
-            </div>
-            <div class="nav-item">
-                <div class="nav-icon"></div>
-                <span>联系人</span>
-            </div>
-            <div class="nav-item">
-                <div class="nav-icon"></div>
-                <span>设置</span>
-            </div>
+            <div class="nav-item active"><div class="nav-icon"></div><span>通话</span></div>
+            <div class="nav-item"><div class="nav-icon"></div><span>联系人</span></div>
+            <div class="nav-item"><div class="nav-icon"></div><span>设置</span></div>
         </nav>
     </div>
 
     <script>
-        // --- Supabase 配置 ---
         const SUPABASE_URL = 'https://cbxtlwjpbmuniexcuzrp.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_Bsfqqe6VtGO_yFth6JyDLw_-SA4V3EM';
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- 进入应用逻辑 ---
-        function enterApp() {
-            const splash = document.getElementById('splash-screen');
-            const app = document.getElementById('main-app');
-            splash.classList.add('hidden');
+        async function enterApp() {
+            document.getElementById('splash-screen').classList.add('hidden');
             setTimeout(() => {
-                splash.style.display = 'none';
-                app.style.opacity = '1';
+                document.getElementById('splash-screen').style.display = 'none';
+                document.getElementById('main-app').style.opacity = '1';
             }, 800);
+            checkUser();
         }
 
-        // --- 核心兑换逻辑 ---
+        // 检查登录状态
+        async function checkUser() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                document.getElementById('auth-card').style.display = 'none';
+                document.getElementById('recharge-card').style.display = 'block';
+                fetchBalance(user.id);
+            } else {
+                document.getElementById('auth-card').style.display = 'block';
+                document.getElementById('recharge-card').style.display = 'none';
+                document.getElementById('balance-val').innerText = '未登录';
+            }
+        }
+
+        // 登录/注册逻辑
+        async function handleLogin() {
+            const email = document.getElementById('email-input').value;
+            const password = document.getElementById('password-input').value;
+            
+            // 尝试登录
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            
+            if (error) {
+                // 如果登录失败，尝试注册
+                const { data: regData, error: regError } = await supabase.auth.signUp({ email, password });
+                if (regError) return alert('错误: ' + regError.message);
+                alert('注册成功！请去邮箱查收确认邮件（如果有开启的话），然后重新登录。');
+            } else {
+                checkUser();
+            }
+        }
+
+        // 退出登录
+        async function handleLogout() {
+            await supabase.auth.signOut();
+            checkUser();
+        }
+
+        async function fetchBalance(userId) {
+            const { data } = await supabase.from('profiles').select('mist_coins').eq('id', userId).single();
+            if (data) document.getElementById('balance-val').innerText = `余额: ${data.mist_coins} Mist`;
+        }
+
         async function handleRedeem() {
-            const inputEl = document.getElementById('cdk-input');
-            const btnEl = document.getElementById('btn-submit');
-            const msgEl = document.getElementById('status-msg');
-            const code = inputEl.value.trim();
-
-            if (!code) {
-                showMsg("请输入卡密", "error");
-                return;
-            }
-
-            // 禁用按钮防止重复点击
-            btnEl.disabled = true;
-            showMsg("正在核验...", "");
-
-            try {
-                // 1. 查询卡密 (精确匹配 key_code)
-                // 注意：这里必须和数据库里的字段名完全一致
-                const { data, error } = await _supabase
-                    .from('cdk_keys')
-                    .select('*')
-                    .eq('key_code', code)
-                    .maybeSingle(); // 获取单个结果
-
-                if (error) throw error;
-
-                // 2. 检查卡密是否存在
-                if (!data) {
-                    showMsg("❌ 卡密无效，请检查大小写", "error");
-                    btnEl.disabled = false;
-                    return;
-                }
-
-                // 3. 检查是否已被使用
-                if (data.is_used === true) {
-                    showMsg("❌ 该卡密已被使用过", "error");
-                    btnEl.disabled = false;
-                    return;
-                }
-
-                // 4. 执行兑换 (更新数据库 is_used 状态)
-                const { error: updateError } = await _supabase
-                    .from('cdk_keys')
-                    .update({ 
-                        is_used: true,
-                        // used_by: 'current_user_id' // 如果你有登录系统，这里填用户ID
-                    })
-                    .eq('id', data.id);
-
-                if (updateError) throw updateError;
-
-                // 5. 兑换成功
-                showMsg(`✅ 兑换成功！获得 ${data.coin_amount || 0} 金币`, "success");
-                document.getElementById('user-balance').innerText = `余额: ${data.coin_amount || 0}`;
-                inputEl.value = ""; // 清空输入框
-
-            } catch (err) {
-                console.error(err);
-                showMsg("系统错误: " + err.message, "error");
-            } finally {
-                btnEl.disabled = false;
-            }
-        }
-
-        function showMsg(text, type) {
-            const msgEl = document.getElementById('status-msg');
-            msgEl.innerText = text;
-            msgEl.className = type === "error" ? "msg-error" : (type === "success" ? "msg-success" : "");
+            const code = document.getElementById('cdk-input').value.trim();
+            const { data, error } = await supabase.rpc('redeem_cdk', { input_code: code });
+            if (error) alert('充值出错: ' + error.message);
+            else if (data.success) {
+                alert('✨ ' + data.message);
+                document.getElementById('cdk-input').value = '';
+                const { data: { user } } = await supabase.auth.getUser();
+                fetchBalance(user.id);
+            } else alert('❌ ' + data.message);
         }
     </script>
 </body>
