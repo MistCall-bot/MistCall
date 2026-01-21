@@ -2,286 +2,204 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MistCall</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MistCall 开发者内部调试工具</title>
     <!-- 引入 Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* =================视觉风格保持一致================= */
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #f0f2f5; }
-
-        /* 开机封面 */
-        #splash-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 9999; transition: opacity 0.8s ease; cursor: pointer;
-        }
-        .splash-title {
-            font-family: "Didot", "Bodoni MT", serif; font-size: 3.8rem; font-weight: bold; font-style: italic;
-            background: linear-gradient(110deg, #8e9eab 20%, #ffffff 45%, #a1c4fd 50%, #fbc2eb 55%, #8e9eab 80%);
-            background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            animation: shineRight 4.5s linear infinite;
-        }
-        .splash-slogan { font-family: "Snell Roundhand", cursive; margin-top: 15px; font-size: 1.2rem; color: rgba(142, 158, 171, 0.5); }
-        .tap-hint { position: absolute; bottom: 60px; font-size: 0.9rem; color: #7a8b99; animation: breathe 3s ease-in-out infinite; }
-
-        @keyframes shineRight { 0% { background-position: -100% center; } 100% { background-position: 200% center; } }
-        @keyframes breathe { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
-
-        /* 登录/注册界面 */
-        #auth-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.8); backdrop-filter: blur(20px);
-            z-index: 9000; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 40px;
-        }
-        .auth-container { width: 100%; max-width: 320px; }
-        .auth-title { font-size: 1.5rem; margin-bottom: 30px; text-align: center; color: #333; font-weight: 300; }
-        .input-group { margin-bottom: 15px; }
-        .input-group input { width: 100%; padding: 14px 15px; border-radius: 12px; border: 1px solid #ddd; outline: none; font-size: 16px; }
-        .auth-btn { width: 100%; padding: 14px; border-radius: 12px; border: none; background: #333; color: white; font-size: 1rem; cursor: pointer; margin-top: 10px; }
-        .switch-mode { margin-top: 20px; font-size: 0.85rem; color: #666; text-align: center; cursor: pointer; text-decoration: underline; }
-
-        /* 主界面 */
-        #main-app { opacity: 0; display: none; transition: opacity 1s ease; height: 100%; flex-direction: column; }
-        .header { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid rgba(0,0,0,0.05); background: rgba(255,255,255,0.6); backdrop-filter: blur(10px); }
-        .header-title { font-size: 1.1rem; font-weight: 600; color: #333; }
-        .content { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-        
-        .card { background: #fff; padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
-        .card h3 { font-size: 0.9rem; margin-bottom: 10px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
-        .balance-num { font-size: 2.5rem; font-weight: bold; color: #333; margin-bottom: 5px; }
-        .balance-unit { font-size: 1rem; color: #999; margin-left: 5px; font-weight: normal; }
-        
-        .recharge-box { display: flex; flex-direction: column; gap: 12px; margin-top: 5px; }
-        .recharge-input { width: 100%; padding: 14px; border: 1px solid #eee; border-radius: 12px; outline: none; background: #f9f9f9; font-size: 1rem; }
-        .recharge-btn { width: 100%; padding: 14px; background: #5B86E5; color: #fff; border: none; border-radius: 12px; cursor: pointer; font-weight: 600; }
-
-        .nav-bar { height: 75px; background: #fff; border-top: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-around; align-items: center; padding-bottom: 15px; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #bbb; font-size: 0.75rem; }
-        .nav-item.active { color: #5B86E5; }
-        .nav-icon { width: 22px; height: 22px; background: #eee; border-radius: 6px; }
-        .nav-item.active .nav-icon { background: #5B86E5; }
-
-        .hidden { opacity: 0; pointer-events: none; }
-        #auth-msg, #recharge-msg { font-size: 0.8rem; margin-top: 10px; text-align: center; min-height: 1em; }
+        :root { --primary: #5B86E5; --bg: #f5f7fa; --card: #ffffff; --text: #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 480px; }
+        .card { background: var(--card); border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h2 { font-size: 1.2rem; margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 2px; }
+        input { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #eee; border-radius: 10px; box-sizing: border-box; outline: none; transition: 0.3s; }
+        input:focus { border-color: var(--primary); }
+        button { width: 100%; padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-bottom: 8px; }
+        .btn-main { background: var(--primary); color: white; }
+        .btn-main:hover { opacity: 0.9; }
+        .btn-sub { background: #f0f2f5; color: #666; }
+        .wallet-row { display: flex; gap: 15px; margin-bottom: 15px; }
+        .wallet-card { flex: 1; background: #f8faff; padding: 15px; border-radius: 15px; text-align: center; border: 1px solid #eef2ff; }
+        .wallet-card label { display: block; font-size: 0.75rem; color: #999; margin-bottom: 5px; }
+        .wallet-card span { font-size: 1.3rem; font-weight: bold; color: var(--primary); }
+        .agent-item { padding: 15px; border-bottom: 1px solid #f5f5f5; display: flex; justify-content: space-between; align-items: center; }
+        .agent-info { font-size: 0.9rem; }
+        .agent-price { color: #f39c12; font-weight: bold; }
+        .status-tag { font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: #eee; margin-left: 5px; }
+        #auth-log { font-size: 0.8rem; color: #ff4d4f; text-align: center; }
     </style>
 </head>
 <body>
 
-    <!-- 1. 开机封面 -->
-    <div id="splash-screen" onclick="checkAuth()">
-        <div class="splash-title">MistCall</div>
-        <div class="splash-slogan">You are the only color in my world.</div>
-        <div class="tap-hint">点击屏幕开始</div>
+<div class="container">
+    <!-- 1. 登录与注册 -->
+    <div id="auth-panel" class="card">
+        <h2>身份验证</h2>
+        <input type="email" id="email" placeholder="电子邮箱">
+        <input type="password" id="pw" placeholder="密码">
+        <button class="btn-main" onclick="signUp()">新用户注册</button>
+        <button class="btn-sub" onclick="signIn()">登录已有账号</button>
+        <div id="auth-log"></div>
+        <p style="font-size: 0.7rem; color: #999; margin-top: 10px;">* 注意：如果注册后没收到邮件，请在 Supabase 后台关闭 "Confirm Email" 开关。</p>
     </div>
 
-    <!-- 2. 登录/注册界面 -->
-    <div id="auth-screen">
-        <div class="auth-container">
-            <div class="auth-title" id="auth-ui-title">登录 MistCall</div>
-            <div class="input-group">
-                <input type="email" id="email" placeholder="电子邮箱">
-            </div>
-            <div class="input-group">
-                <input type="password" id="password" placeholder="密码">
-            </div>
-            <button class="auth-btn" id="auth-main-btn" onclick="handleAuth()">登 录</button>
-            <div class="switch-mode" id="auth-switch" onclick="toggleAuthMode()">没有账号？去注册</div>
-            <div id="auth-msg"></div>
-        </div>
-    </div>
-
-    <!-- 3. 主应用界面 -->
-    <div id="main-app">
-        <header class="header">
-            <div class="header-title">我的钱包</div>
-            <div onclick="signOut()" style="font-size: 0.8rem; color: #999; cursor: pointer;">退出登录</div> 
-        </header>
-
-        <div class="content">
-            <!-- 余额显示 -->
-            <div class="card">
-                <h3>当前余额</h3>
-                <div class="balance-num" id="user-balance">0.00<span class="balance-unit">Mist币</span></div>
-                <div style="font-size: 0.8rem; color: #bbb;">钻石余额: <span id="user-diamond">0.00</span></div>
-            </div>
-
-            <!-- 卡密充值 -->
-            <div class="card">
-                <h3>卡密兑换</h3>
-                <div class="recharge-box">
-                    <input type="text" id="cdkey" class="recharge-input" placeholder="输入 12 位兑换码">
-                    <button class="recharge-btn" onclick="handleRedeem()">立即兑换</button>
-                </div>
-                <div id="recharge-msg"></div>
-            </div>
-
-            <!-- 提示信息 -->
-            <div style="padding: 10px; color: #999; font-size: 0.8rem; line-height: 1.6;">
-                * 卡密可通过爱发电或官方渠道获取。<br>
-                * Mist 币用于解锁智能体，解锁后永久有效。
-            </div>
+    <!-- 2. 用户主面板 -->
+    <div id="main-panel" class="card" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <span id="user-email" style="font-size: 0.8rem; color: #666;"></span>
+            <button onclick="signOut()" style="width: auto; padding: 5px 10px; font-size: 0.7rem;" class="btn-sub">退出</button>
         </div>
 
-        <nav class="nav-bar">
-            <div class="nav-item active">
-                <div class="nav-icon"></div>
-                <span>钱包</span>
+        <div class="wallet-row">
+            <div class="wallet-card">
+                <label>Mist 币 (余额)</label>
+                <span id="stat-coins">0</span>
             </div>
-            <div class="nav-item">
-                <div class="nav-icon"></div>
-                <span>智能体</span>
+            <div class="wallet-card">
+                <label>钻石 (分成收益)</label>
+                <span id="stat-diamonds">0</span>
             </div>
-            <div class="nav-item">
-                <div class="nav-icon"></div>
-                <span>设置</span>
-            </div>
-        </nav>
+        </div>
+        <button class="btn-sub" style="color: #28a745; background: #e8f5e9;" onclick="addTestMoney()">【测试用】给自己充值 100 币</button>
+
+        <h2>发布智能体</h2>
+        <input type="text" id="agent-name" placeholder="智能体名称 (大号操作)">
+        <input type="number" id="agent-price" placeholder="价格 (Mist币)">
+        <button class="btn-main" onclick="publishAgent()">确认发布</button>
+
+        <h2 style="margin-top: 20px;">智能体市场</h2>
+        <div id="market-list" style="font-size: 0.8rem; color: #999; text-align: center;">正在同步数据...</div>
     </div>
+</div>
 
-    <script>
-        // --- Supabase 配置 (已根据你的信息填入) ---
-        const SUPABASE_URL = 'https://cbxtlwjpbmuniexcuzrp.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_Bsfqqe6VtGO_yFth6JyDLw_-SA4V3EM';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+<script>
+    // 初始化 Supabase
+    const supabaseUrl = 'https://cbxtlwjpbmuniexcuzrp.supabase.co';
+    const supabaseKey = 'sb_publishable_Bsfqqe6VtGO_yFth6JyDLw_-SA4V3EM';
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-        let isRegisterMode = false;
+    let sessionUser = null;
 
-        // 1. 检查登录状态
-        async function checkAuth() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            const splash = document.getElementById('splash-screen');
-            splash.classList.add('hidden');
-            
-            setTimeout(() => {
-                splash.style.display = 'none';
-                if (session) {
-                    showApp();
-                } else {
-                    document.getElementById('auth-screen').style.display = 'flex';
-                }
-            }, 800);
+    // 页面加载检查登录
+    window.onload = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            sessionUser = session.user;
+            showUI();
+        }
+    };
+
+    // 注册
+    async function signUp() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('pw').value;
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) document.getElementById('auth-log').innerText = error.message;
+        else alert("注册发起！请去邮箱确认（或在后台关闭邮件确认）。");
+    }
+
+    // 登录
+    async function signIn() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('pw').value;
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) document.getElementById('auth-log').innerText = error.message;
+        else { sessionUser = data.user; showUI(); }
+    }
+
+    // 退出
+    async function signOut() {
+        await supabase.auth.signOut();
+        location.reload();
+    }
+
+    // 显示界面并刷新数据
+    function showUI() {
+        document.getElementById('auth-panel').style.display = 'none';
+        document.getElementById('main-panel').style.display = 'block';
+        document.getElementById('user-email').innerText = sessionUser.email;
+        refreshData();
+    }
+
+    // 核心数据查询
+    async function refreshData() {
+        // 1. 获取余额
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', sessionUser.id)
+            .single();
+        
+        if (profile) {
+            document.getElementById('stat-coins').innerText = profile.mist_coins;
+            document.getElementById('stat-diamonds').innerText = profile.mist_diamond;
         }
 
-        // 2. 切换登录/注册 UI
-        function toggleAuthMode() {
-            isRegisterMode = !isRegisterMode;
-            document.getElementById('auth-ui-title').innerText = isRegisterMode ? '注册 MistCall' : '登录 MistCall';
-            document.getElementById('auth-main-btn').innerText = isRegisterMode ? '注 册' : '登 录';
-            document.getElementById('auth-switch').innerText = isRegisterMode ? '已有账号？去登录' : '没有账号？去注册';
-            document.getElementById('auth-msg').innerText = "";
+        // 2. 获取市场列表
+        const { data: agents } = await supabase.from('agents').select('*');
+        const listDiv = document.getElementById('market-list');
+        listDiv.innerHTML = "";
+        
+        if (agents && agents.length > 0) {
+            agents.forEach(a => {
+                const item = document.createElement('div');
+                item.className = 'agent-item';
+                item.innerHTML = `
+                    <div class="agent-info">
+                        <strong>${a.name}</strong> <span class="status-tag">作者:${a.creator_id.substring(0,5)}</span><br>
+                        <span class="agent-price">${a.price} Mist币</span>
+                    </div>
+                    <button class="btn-main" style="width: 60px; padding: 5px; font-size: 0.7rem;" onclick="buyAgent('${a.id}')">购买</button>
+                `;
+                listDiv.appendChild(item);
+            });
+        } else {
+            listDiv.innerText = "市场空空如也，快去发布吧";
         }
+    }
 
-        // 3. 处理登录或注册
-        async function handleAuth() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const msgBox = document.getElementById('auth-msg');
-            
-            if(!email || !password) {
-                msgBox.innerText = "请填写完整信息";
-                return;
-            }
+    // 模拟加钱
+    async function addTestMoney() {
+        const { error } = await supabase
+            .from('profiles')
+            .update({ mist_coins: 100 })
+            .eq('id', sessionUser.id);
+        
+        if (error) alert("加钱失败: " + error.message);
+        else refreshData();
+    }
 
-            msgBox.style.color = "#666";
-            msgBox.innerText = "正在处理...";
+    // 发布智能体
+    async function publishAgent() {
+        const name = document.getElementById('agent-name').value;
+        const price = document.getElementById('agent-price').value;
+        if(!name || !price) return alert("请填写完整");
 
-            if (isRegisterMode) {
-                const { data, error } = await supabaseClient.auth.signUp({ email, password });
-                if (error) {
-                    msgBox.style.color = "red";
-                    msgBox.innerText = "注册失败: " + error.message;
-                } else {
-                    msgBox.style.color = "green";
-                    msgBox.innerText = "注册成功！请登录";
-                    toggleAuthMode();
-                }
+        const { error } = await supabase.from('agents').insert([
+            { name, price: parseFloat(price), creator_id: sessionUser.id }
+        ]);
+
+        if (error) alert("发布失败: " + error.message);
+        else { alert("发布成功！"); refreshData(); }
+    }
+
+    // 购买智能体 (核心：调用 RPC 函数)
+    async function buyAgent(agentId) {
+        const { data, error } = await supabase.rpc('buy_agent', { target_agent_id: agentId });
+        
+        if (error) {
+            alert("RPC 调用失败 (请检查 SQL 函数是否创建成功): " + error.message);
+        } else {
+            if (data.success) {
+                alert("购买成功！" + data.message);
             } else {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) {
-                    msgBox.style.color = "red";
-                    msgBox.innerText = "登录失败: " + error.message;
-                } else {
-                    showApp();
-                }
+                alert("失败: " + data.message);
             }
+            refreshData();
         }
+    }
+</script>
 
-        // 4. 显示主程序
-        async function showApp() {
-            document.getElementById('auth-screen').style.display = 'none';
-            const app = document.getElementById('main-app');
-            app.style.display = 'flex';
-            setTimeout(() => app.style.opacity = '1', 50);
-            
-            fetchUserData();
-        }
-
-        // 5. 获取用户数据 (对应你 SQL 里的 mist_coins 字段)
-        async function fetchUserData() {
-            const { data: { user } } = await supabaseClient.auth.getUser();
-            if (!user) return;
-
-            // 获取 profiles 数据
-            let { data, error } = await supabaseClient
-                .from('profiles')
-                .select('mist_coins, mist_diamond')
-                .eq('id', user.id)
-                .single();
-            
-            // 如果 profiles 还没有该用户（新注册），则创建一条
-            if (error && error.code === 'PGRST116') {
-                const { data: newData } = await supabaseClient
-                    .from('profiles')
-                    .insert([{ id: user.id, username: user.email.split('@')[0], mist_coins: 0, mist_diamond: 0 }])
-                    .select()
-                    .single();
-                data = newData;
-            }
-
-            if (data) {
-                document.getElementById('user-balance').innerHTML = `${parseFloat(data.mist_coins).toFixed(2)}<span class="balance-unit">Mist币</span>`;
-                document.getElementById('user-diamond').innerText = parseFloat(data.mist_diamond).toFixed(2);
-            }
-        }
-
-        // 6. 处理卡密充值 (对应你 SQL 里的 redeem_cdk 函数)
-        async function handleRedeem() {
-            const key = document.getElementById('cdkey').value.trim();
-            const msgBox = document.getElementById('recharge-msg');
-            
-            if (!key) {
-                msgBox.innerText = "请输入卡密";
-                return;
-            }
-            
-            msgBox.style.color = "#666";
-            msgBox.innerText = "核销中...";
-
-            // 调用 SQL 函数 redeem_cdk
-            const { data, error } = await supabaseClient.rpc('redeem_cdk', { input_code: key });
-
-            if (error) {
-                msgBox.style.color = "red";
-                msgBox.innerText = "系统错误: " + error.message;
-            } else if (data.success) {
-                msgBox.style.color = "green";
-                msgBox.innerText = data.message;
-                document.getElementById('cdkey').value = "";
-                fetchUserData(); // 刷新余额
-            } else {
-                msgBox.style.color = "red";
-                msgBox.innerText = data.message;
-            }
-        }
-
-        // 7. 退出登录
-        async function signOut() {
-            await supabaseClient.auth.signOut();
-            window.location.reload();
-        }
-    </script>
 </body>
 </html>
