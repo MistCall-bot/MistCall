@@ -2,204 +2,2141 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MistCall 开发者内部调试工具</title>
-    <!-- 引入 Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta name="referrer" content="no-referrer">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MistCall</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Pinyon+Script&display=swap" rel="stylesheet">
     <style>
-        :root { --primary: #5B86E5; --bg: #f5f7fa; --card: #ffffff; --text: #333; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 20px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 480px; }
-        .card { background: var(--card); border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        h2 { font-size: 1.2rem; margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
-        h2::before { content: ""; width: 4px; height: 18px; background: var(--primary); border-radius: 2px; }
-        input { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #eee; border-radius: 10px; box-sizing: border-box; outline: none; transition: 0.3s; }
-        input:focus { border-color: var(--primary); }
-        button { width: 100%; padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-bottom: 8px; }
-        .btn-main { background: var(--primary); color: white; }
-        .btn-main:hover { opacity: 0.9; }
-        .btn-sub { background: #f0f2f5; color: #666; }
-        .wallet-row { display: flex; gap: 15px; margin-bottom: 15px; }
-        .wallet-card { flex: 1; background: #f8faff; padding: 15px; border-radius: 15px; text-align: center; border: 1px solid #eef2ff; }
-        .wallet-card label { display: block; font-size: 0.75rem; color: #999; margin-bottom: 5px; }
-        .wallet-card span { font-size: 1.3rem; font-weight: bold; color: var(--primary); }
-        .agent-item { padding: 15px; border-bottom: 1px solid #f5f5f5; display: flex; justify-content: space-between; align-items: center; }
-        .agent-info { font-size: 0.9rem; }
-        .agent-price { color: #f39c12; font-weight: bold; }
-        .status-tag { font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: #eee; margin-left: 5px; }
-        #auth-log { font-size: 0.8rem; color: #ff4d4f; text-align: center; }
+        /* --- CSS 变量初始化 --- */
+        :root {
+            --page-bg: #f7f9fc;
+            --msg-bg: #f8f9fa;
+            --style-bg: #f8f9fa;
+            --input-bg: #ffffff;
+            
+            /* 气泡完全变量化 */
+            --bot-bubble-img: none;
+            --bot-bubble-slice: 0;
+            --bot-bubble-width: 0;
+            --bot-bubble-padding: 10px;
+            --bot-bubble-min-height: 40px;
+            --bot-bubble-text-color: #333;
+            --bot-bubble-border-style: solid;
+            
+            --user-bubble-img: none;
+            --user-bubble-slice: 0;
+            --user-bubble-width: 0;
+            --user-bubble-padding: 10px;
+            --user-bubble-min-height: 40px;
+            --user-bubble-text-color: #fff;
+            --user-bubble-border-style: solid;
+            
+            /* 新增透明UI变量 */
+            --header-bg: rgba(255,255,255,0.8);
+            --nav-bg: rgba(255,255,255,0.95);
+            --card-bg: rgba(255,255,255,0.9);
+            --ui-blur: 8px;
+            --text-color: #1e293b;
+            
+            /* 新增沉浸式UI变量 */
+            --ui-header-bg: rgba(255,255,255,0.8);
+            --ui-nav-bg: rgba(255,255,255,0.95);
+            --ui-card-bg: rgba(255,255,255,0.9);
+            --ui-text-main: #1e293b;
+            --ui-text-sub: #94a3b8;
+            --ui-blur: 8px;
+            --ui-icon-size: 24px;
+            
+            /* 新增气泡变量（新命名） */
+            --bot-min-h: 40px;
+            --bot-text-color: #333;
+            --user-min-h: 40px;
+            --user-text-color: #fff;
+            
+            /* 新增底图变量 */
+            --page-bg-img: none;
+        }
+
+        /* 应用背景图 */
+        #main-app { background: var(--page-bg-img) !important; background-size: cover; }
+        #tab-msg { background: var(--msg-bg); background-size: cover; }
+        #tab-style { background: var(--style-bg); background-size: cover; }
+        .chat-footer { background: var(--input-bg) !important; background-size: cover; }
+
+        /* 智能体气泡补丁样式 - 完全变量化 */
+        .bubble-bot {
+            border-image-source: var(--bot-bubble-img);
+            border-image-slice: var(--bot-bubble-slice);
+            border-width: var(--bot-bubble-width);
+            border-style: var(--bot-bubble-border-style);
+            padding: var(--bot-bubble-padding) !important;
+            min-height: var(--bot-min-h) !important;
+            display: flex;
+            align-items: center;
+            box-sizing: border-box;
+            background: none !important; /* 有主题时去掉默认底色 */
+            color: var(--bot-text-color) !important;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            word-wrap: break-word;
+            max-width: 70%;
+            border-radius: 0; /* 由边框图片提供圆角 */
+            margin-left: 10px;
+        }
+
+        /* 我的气泡补丁样式 - 完全变量化 */
+        .bubble-user {
+            border-image-source: var(--user-bubble-img);
+            border-image-slice: var(--user-bubble-slice);
+            border-width: var(--user-bubble-width);
+            border-style: var(--user-bubble-border-style);
+            padding: var(--user-bubble-padding) !important;
+            min-height: var(--user-min-h) !important;
+            display: flex;
+            align-items: center;
+            box-sizing: border-box;
+            background: none !important;
+            color: var(--user-text-color) !important;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            word-wrap: break-word;
+            max-width: 70%;
+            border-radius: 0; /* 由边框图片提供圆角 */
+            margin-right: 10px;
+        }
+
+        /* 导航栏图标加大，并拉近与文字的距离 */
+        .nav-item img { 
+            width: 42px !important; /* 从36px放大到42px */
+            height: 42px !important; 
+            object-fit: contain; 
+            margin-bottom: -2px; /* 负边距让文字贴近图标 */
+            transition: all 0.3s ease; /* 增加平滑过渡 */
+            -webkit-touch-callout: none; /* 禁止长按弹出下载菜单 */
+        }
+
+        /* 导航栏项目布局调整 */
+        .nav-item { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            color: var(--ui-text-sub) !important; 
+            cursor: pointer; 
+            font-size: 0.7rem; 
+            gap: 0px; /* 彻底消除间隙 */
+        }
+
+        /* --- 全局重置 --- */
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        input[type="text"], input[type="password"], textarea { border: 1px solid #ddd; }
+        body, html { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; background-color: #f7f9fc; color: #333; margin: 0; padding: 0; }
+
+        /* 全局禁止图片长按弹出系统菜单 */
+        img {
+            -webkit-touch-callout: none !important; 
+            -webkit-user-select: none !important;
+            user-select: none !important;
+            pointer-events: auto; /* 保证点击事件依然有效 */
+        }
+
+        /* --- 1. 封面 --- */
+        #cover-page {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 999;
+            background: linear-gradient(135deg, #ffffff 0%, #e3e6e8 40%, #8d99ae 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            transition: opacity 0.6s ease;
+        }
+        .brand-title {
+            font-family: 'Pinyon Script', cursive; font-size: 6rem;
+            background: linear-gradient(to right, #ffffff 0%, #a3b5d3 25%, #b8a9c6 50%, #d3a3b5 75%, #ffffff 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            animation: shine 3s linear infinite;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+            line-height: 1.2;
+        }
+        @keyframes shine { 
+            from { background-position: 200% center; }
+            to { background-position: -200% center; }
+        }
+        .tap-hint { font-size: 0.75rem; letter-spacing: 3px; text-transform: uppercase; color: #555; opacity: 0.6; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+
+        /* --- 主程序 --- */
+        #main-app { display: none; width: 100%; height: 100%; flex-direction: column; opacity: 0; transition: opacity 0.4s ease; }
+        
+        /* Header - 变透明 */
+        .header { 
+            height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; 
+            background: var(--ui-header-bg) !important; 
+            backdrop-filter: blur(var(--ui-blur));
+            border-bottom: 1px solid rgba(255,255,255,0.2); 
+            z-index: 10; 
+            flex-shrink: 0;
+        }
+        .header-title { font-weight: 600; font-size: 1.05rem; text-align: center; flex: 1; color: var(--ui-text-main) !important; }
+        .header-icon { cursor: pointer; color: #2980b9; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+
+        .content-area { flex: 1; overflow-y: auto; background: #f8f9fa; position: relative; overflow-x: hidden; }
+        .tab-page { display: none; padding-bottom: 100px; height: 100%; }
+        .tab-page.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Bottom Nav - 变透明 */
+        .bottom-nav { 
+            height: 60px; 
+            background: var(--ui-nav-bg) !important; 
+            backdrop-filter: blur(var(--ui-blur));
+            border-top: 1px solid rgba(255,255,255,0.2); 
+            display: flex; padding-bottom: env(safe-area-inset-bottom); flex-shrink: 0;
+        }
+        .nav-item.active { color: #334155; font-weight: 600; }
+
+        /* --- Msg List Swipe Styles - 变透明 --- */
+        .msg-cell-wrapper { 
+            position: relative; overflow: hidden; 
+            background-color: #ffffff !important; /* 列表容器也设为白色，防止滑动时的缝隙透出背景 */
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
+            height: 80px; 
+        }
+        .msg-cell-content {
+            width: 100%; height: 100%; 
+            background-color: #ffffff !important; /* 默认白色不透明 */
+            background-image: var(--ui-card-bg) !important; /* 如果有皮肤，应用皮肤背景 */
+            background-size: cover;
+            opacity: 1 !important; /* 确保不透明 */
+            backdrop-filter: blur(var(--ui-blur));
+            display: flex; align-items: center; padding: 0 20px;
+            position: absolute; top: 0; left: 0; z-index: 10; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            cursor: pointer;
+        }
+        .msg-cell-actions {
+            position: absolute; top: 0; right: 0; height: 100%; display: flex; z-index: 5;
+        }
+        .swipe-btn {
+            width: 70px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: #fff; font-size: 0.75rem; font-weight: bold; gap: 4px; cursor: pointer;
+        }
+        .btn-pin { background-color: #f39c12; }
+        .btn-del { background-color: #e74c3c; }
+        
+        .cell-avatar { width: 50px; height: 50px; border-radius: 50%; margin-right: 15px; object-fit: cover; background: #eee; border: 1px solid #eee; pointer-events: none; }
+        .cell-content { pointer-events: none; flex: 1; }
+        .cell-content h3 { font-size: 1rem; color: #333; margin-bottom: 4px; font-weight: 600; display: flex; justify-content: space-between; }
+        .pin-icon { width: 14px; height: 14px; color: #f39c12; display: none; }
+        .is-pinned .pin-icon { display: block; }
+        .is-pinned { background: rgba(255, 252, 245, 0.9); } 
+        .cell-content p { font-size: 0.85rem; color: #888; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 200px; }
+
+        /* --- Page: Me --- */
+        .settings-card { 
+            background: var(--ui-card-bg) !important; 
+            backdrop-filter: blur(var(--ui-blur));
+            border-radius: 12px; 
+            margin: 10px;
+            padding: 0 20px; 
+            margin-bottom: 15px; 
+        }
+        .card-header { padding: 20px 0 10px 0; font-size: 0.9rem; font-weight: bold; color: #2c3e50; border-bottom: 1px solid #eee; margin-bottom: 10px; }
+        .field-row { padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .field-label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 5px; }
+        .input-group { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        /* 统一输入框宽度 */
+        .field-input { 
+            flex: 1; 
+            border: none; 
+            font-size: 0.95rem; 
+            background: transparent; 
+            padding: 8px 0; 
+            color: #333; 
+            outline: none;
+            width: 100%;
+            min-width: 0; /* 防止flex布局溢出 */
+        }
+        .btn-mini { padding: 6px 12px; background: #eef2f5; color: #5d6d7e; font-size: 0.75rem; border-radius: 4px; border: 1px solid #dce1e6; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .btn-mini.success { background: #ebf9f1; color: #27ae60; border-color: #d1e7dd; }
+        .model-list-pop { background: rgba(255,255,255,0.95); border: 1px solid #eee; border-radius: 6px; margin-top: 5px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease; backdrop-filter: blur(var(--ui-blur)); }
+        .model-list-pop.show { max-height: 300px; overflow-y: auto; padding: 5px 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .model-opt { padding: 8px 12px; font-size: 0.85rem; color: #666; cursor: pointer; border-bottom: 1px solid #fbfbfb; }
+        .model-opt:hover { background: #f5f7fa; color: #2c3e50; }
+
+        /* --- Agent Editor --- */
+        #agent-editor {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff;
+            z-index: 400; display: none; flex-direction: column; overflow-y: auto;
+            transform: translateY(100%); transition: transform 0.3s ease;
+        }
+        #agent-editor.open { transform: translateY(0); }
+        .editor-nav { height: 50px; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; border-bottom: 1px solid #eee; background: #fff; position: sticky; top: 0; z-index: 20; }
+
+        .visual-editor { position: relative; width: 100%; height: 260px; background: #f0f2f5; margin-bottom: 20px; }
+        .bg-upload-zone {
+            width: 100%; height: 200px; background: #e1e4e8; position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .bg-upload-zone img, .bg-upload-zone video { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+        
+        .avatar-upload-zone {
+            width: 80px; height: 80px; border-radius: 50%; background: #fff;
+            position: absolute; bottom: 10px; left: 20px;
+            border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; z-index: 10;
+        }
+        .avatar-upload-zone img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+
+        .editor-form { padding: 0 20px; padding-bottom: 50px; }
+        .form-section { margin-bottom: 20px; position: relative; }
+        .section-label { font-size: 0.85rem; font-weight: bold; color: #34495e; margin-bottom: 8px; border-left: 3px solid #34495e; padding-left: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .edit-input { width: 100%; padding: 12px; background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; font-size: 0.9rem; outline: none; }
+        .textarea-wrapper { position: relative; }
+        .edit-area { width: 100%; padding: 12px; padding-right: 30px; background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; font-size: 0.9rem; height: 100px; resize: none; outline: none; }
+        .expand-btn { 
+            position: absolute; top: 8px; right: 8px; color: #64748b; cursor: pointer; z-index: 5;
+            width: 24px; height: 24px; background: rgba(255,255,255,0.6); border-radius: 4px;
+            display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0;
+        }
+
+        #edit-gender { width: auto; flex: none; padding: 12px 20px; text-align: center; }
+        .char-limit { text-align: right; font-size: 0.7rem; color: #999; margin-top: 2px; }
+
+        /* Fullscreen Editor */
+        #fullscreen-editor { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 500; display: none; flex-direction: column; }
+        #fullscreen-editor.open { display: flex; animation: fadeIn 0.2s; }
+        .fs-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: flex-end; }
+        .fs-done { color: #2980b9; font-weight: bold; cursor: pointer; }
+        .fs-input { flex: 1; padding: 20px; border: none; font-size: 1rem; line-height: 1.6; resize: none; outline: none; }
+
+        /* --- Chat Room --- */
+        #chat-room {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000;
+            z-index: 300; display: none; flex-direction: column;
+            transform: translateX(100%); transition: transform 0.3s;
+        }
+        #chat-room.open { transform: translateX(0); }
+        
+        .chat-bg-layer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; 
+            background-size: cover !important; 
+            background-position: center !important; 
+            background-repeat: no-repeat;
+        }
+        
+        .chat-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background: rgba(0,0,0,0.4); pointer-events: none; }
+        .chat-header-trans { height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; color: #fff; font-weight: bold; z-index: 10; background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent); }
+        .chat-main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; z-index: 10; padding-bottom: 20px; }
+        
+        .chat-row { display: flex; flex-direction: column; margin-bottom: 5px; }
+        .chat-row-inner { display: flex; align-items: flex-start; }
+        .chat-row.bot .chat-row-inner { justify-content: flex-start; }
+        .chat-row.user .chat-row-inner { justify-content: flex-end; }
+        .chat-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.3); }
+        
+        .msg-actions { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+        .chat-row.bot .msg-actions { margin-left: 50px; justify-content: flex-start; }
+        .chat-row.user .msg-actions { margin-right: 50px; justify-content: flex-end; }
+        
+        .action-btn { 
+            font-size: 0.65rem; color: rgba(255,255,255,0.8); background: rgba(0,0,0,0.4); 
+            padding: 2px 8px; border-radius: 8px; cursor: pointer; backdrop-filter: blur(4px); 
+            transition: background 0.2s; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .action-btn:hover { background: rgba(255,255,255,0.25); color: #fff; }
+
+        /* 聊天页输入框背景图补丁 */
+        .chat-footer { 
+            background-color: #ffffff !important; /* 默认白色，不装皮肤也不会透明 */
+            background-image: var(--input-bg) !important; /* 有皮肤时覆盖图片 */
+            background-size: 100% 100%;
+            border-top: 1px solid #eee !important; /* 没皮肤时加一条细线区分 */
+            padding: 10px 15px; 
+            display: flex; 
+            align-items: center; 
+            z-index: 10; 
+            padding-bottom: max(10px, env(safe-area-inset-bottom)); 
+            gap: 10px; 
+            position: relative;
+        }
+        /* 内部输入框文字颜色适配 */
+        #msg-in {
+            background: rgba(0,0,0,0.05) !important; /* 浅灰色背景，更像微信/QQ */
+            color: #333 !important; /* 默认黑字 */
+            flex: 1; 
+            border: none; 
+            padding: 10px 15px; 
+            border-radius: 20px; 
+            font-size: 0.95rem; 
+            height: 40px;
+        }
+        /* 如果当前是透明皮肤模式，通过变量自动调节 */
+        #msg-in::placeholder {
+            color: #999 !important;
+        }
+        .icon-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; transition: all 0.2s; }
+        .icon-btn:active { color: #334155; transform: scale(0.9); }
+        .icon-btn.send-btn { color: #2563eb; }
+
+        .normal-save-container { width: 100%; display: flex; justify-content: center; padding: 30px 0; }
+        .btn-save {
+            background: #2c3e50; color: #fff; padding: 12px 40px;
+            border-radius: 30px; border: none; font-size: 0.95rem; font-weight: 600;
+            box-shadow: 0 5px 15px rgba(44, 62, 80, 0.3); cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        /* --- More Panel (Drawer) --- */
+        #more-panel {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 85%; 
+            background: #fff; border-radius: 20px 20px 0 0; z-index: 50; 
+            transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom);
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
+        }
+        #more-panel.open { transform: translateY(0); }
+        .more-header { padding: 15px; text-align: center; border-bottom: 1px solid #eee; position: relative; font-weight: bold; color: #334155; display: flex; align-items: center; justify-content: center;}
+        .more-close { position: absolute; right: 15px; top: 15px; color: #94a3b8; cursor: pointer; }
+        
+        /* 4 icons per page (25% width), scrollable */
+        .more-tabs { display: flex; border-bottom: 1px solid #eee; overflow-x: auto; scroll-snap-type: x mandatory; }
+        .more-tab { 
+            flex: 0 0 25%; /* Fixed width to show exactly 4 */
+            text-align: center; padding: 12px 0; font-size: 0.9rem; color: #94a3b8; 
+            cursor: pointer; border-bottom: 2px solid transparent; display: flex; 
+            justify-content: center; gap: 5px; align-items: center; white-space: nowrap;
+            scroll-snap-align: start;
+        }
+        .more-tab.active { color: #334155; font-weight: bold; border-bottom-color: #334155; }
+        .more-tab i { width: 16px; height: 16px; }
+        
+        .more-content { flex: 1; overflow-y: auto; padding: 0; display: none; background: #f8f9fa; touch-action: pan-y; position: relative; }
+        .more-content.active { display: block; }
+        .more-inner-pad { padding: 20px; }
+        
+        .swipe-handle-bar {
+            width: 100%; height: 30px; display: flex; justify-content: center; align-items: center;
+            background: #fff; margin-top: auto; flex-shrink: 0; cursor: grab;
+            border-top: 1px solid transparent; transition: border 0.3s;
+        }
+        .swipe-indicator {
+            width: 60px; height: 5px; background: #cbd5e1; border-radius: 10px;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        #more-panel.open .swipe-indicator { width: 100px; background: #94a3b8; }
+        .swipe-handle-bar:active .swipe-indicator { width: 85px; transform: scaleY(1.3); background: #64748b; }
+
+        /* Slot UI */
+        .slot-container { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        .save-slot { 
+            width: 100%; height: 60px; border: 2px solid #e2e8f0; border-radius: 12px; background: #fff;
+            display: flex; flex-direction: row; align-items: center; justify-content: flex-start; padding: 0 20px;
+            cursor: pointer; position: relative; overflow: hidden; transition: all 0.2s; gap: 15px;
+        }
+        .save-slot.active { border-color: #334155; background: #f1f5f9; }
+        .save-slot i { color: #64748b; margin-bottom: 0; }
+        .save-slot small { font-size: 1rem; color: #334155; font-weight: 500; }
+        .slot-badge { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); width: 8px; height: 8px; background: #ef4444; border-radius: 50%; opacity: 0; }
+        .save-slot.has-data .slot-badge { opacity: 1; }
+
+        /* --- Twitter Page --- */
+        .file-input { display: none; }
+        .twitter-container { background: #000; min-height: 100%; color: #e7e9ea; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding-bottom: 60px;}
+        .tweet-card { border-bottom: 1px solid #2f3336; padding: 12px 16px; transition: background 0.2s; }
+        .tweet-card:hover { background-color: rgba(255,255,255,0.03); }
+        .comment-item { padding: 12px 16px; border-bottom: 1px solid #2f3336; display: flex; gap: 12px; }
+        .like-anim { animation: likeBounce 0.4s; color: #f91880 !important; fill: #f91880; }
+        @keyframes likeBounce { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+        
+        /* Unified Floating Button */
+        .float-tweet-btn {
+            position: absolute; bottom: 60px; right: 20px; 
+            background: #1d9bf0; color: #fff; width: 44px; height: 44px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 60; transition: transform 0.2s;
+        }
+        .float-tweet-btn:active { transform: scale(0.9); }
+
+        /* --- Google Styles --- */
+        #mp-google { background: #202124; color: #e8eaed; }
+        .google-container { min-height: 100%; padding-bottom: 60px; font-family: 'Google Sans', arial, sans-serif; }
+        .google-header { padding: 16px; border-bottom: 1px solid #3c4043; }
+        .fake-search-bar { 
+            display: flex; align-items: center; background: #303134; border-radius: 9999px; padding: 10px 16px; gap: 12px;
+            border: 1px solid transparent; 
+        }
+        .fake-search-bar input { background: transparent; border: none; outline: none; flex: 1; color: #e8eaed; font-size: 0.9rem; }
+        .google-subheader { padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; color: #9aa0a6; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+        .search-item { padding: 12px 20px; display: flex; gap: 16px; align-items: flex-start; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid #202124; }
+        .search-item:hover { background-color: rgba(232, 234, 237, 0.04); }
+        .icon-circle { padding: 8px; border-radius: 50%; margin-top: 2px; }
+        .bg-blue-dark { background: rgba(66, 133, 244, 0.2); } .text-blue-glow { color: #8ab4f8; }
+        .bg-purple-dark { background: rgba(161, 66, 244, 0.2); } .text-purple-glow { color: #c58af9; }
+        .bg-green-dark { background: rgba(52, 168, 83, 0.2); } .text-green-glow { color: #81c995; }
+        .search-content { flex: 1; }
+        .search-title { font-size: 0.95rem; font-weight: 500; color: #e8eaed; display: flex; justify-content: space-between; }
+        .search-time { font-size: 0.75rem; color: #9aa0a6; margin-left: 10px; font-weight: normal; }
+        .search-meta { font-size: 0.75rem; color: #9aa0a6; margin-top: 2px; }
+        .ai-thought-box { margin-top: 6px; font-size: 0.75rem; color: #fcad70; display: flex; align-items: flex-start; gap: 6px; }
+
+        /* --- Summon Tab --- */
+        .summon-box {
+            background: #2c3e50; color: #ecf0f1; padding: 20px; border-radius: 12px;
+            font-family: monospace; font-size: 0.9rem; min-height: 200px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.3); border: 1px solid #34495e;
+            white-space: pre-wrap; line-height: 1.6;
+        }
+
+        /* --- Taobao Styles --- */
+        #mp-taobao { background: #f4f4f4; color: #333; }
+        .tb-orange { color: #ff5000; }
+        .bg-tb-orange { background-color: #ff5000; }
+        .order-card { border-radius: 12px; background: white; margin-bottom: 12px; }
+        .status-tag { color: #ff5000; font-size: 13px; font-weight: bold; }
+        .tb-container { padding: 15px; padding-bottom: 80px; min-height: 100%; }
+
     </style>
 </head>
 <body>
 
-<div class="container">
-    <!-- 1. 登录与注册 -->
-    <div id="auth-panel" class="card">
-        <h2>身份验证</h2>
-        <input type="email" id="email" placeholder="电子邮箱">
-        <input type="password" id="pw" placeholder="密码">
-        <button class="btn-main" onclick="signUp()">新用户注册</button>
-        <button class="btn-sub" onclick="signIn()">登录已有账号</button>
-        <div id="auth-log"></div>
-        <p style="font-size: 0.7rem; color: #999; margin-top: 10px;">* 注意：如果注册后没收到邮件，请在 Supabase 后台关闭 "Confirm Email" 开关。</p>
+    <!-- 1. 封面 -->
+    <div id="cover-page" onclick="enterApp()">
+        <div class="brand-title">MistCall</div>
+        <div class="tap-hint">Tap to Start</div>
     </div>
 
-    <!-- 2. 用户主面板 -->
-    <div id="main-panel" class="card" style="display: none;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <span id="user-email" style="font-size: 0.8rem; color: #666;"></span>
-            <button onclick="signOut()" style="width: auto; padding: 5px 10px; font-size: 0.7rem;" class="btn-sub">退出</button>
+    <!-- 2. 主程序 -->
+    <div id="main-app">
+        <div class="header">
+            <div class="header-icon" style="opacity:0;"><i data-lucide="menu"></i></div>
+            <div class="header-title" id="nav-title">消息</div>
+            <div class="header-icon" id="header-plus" onclick="openAgentEditor(-1)"><i data-lucide="plus"></i></div>
+            <div class="header-icon" id="header-right-space" style="display:none; opacity:0;"></div>
         </div>
 
-        <div class="wallet-row">
-            <div class="wallet-card">
-                <label>Mist 币 (余额)</label>
-                <span id="stat-coins">0</span>
+        <div class="content-area">
+            <div id="tab-msg" class="tab-page active">
+                <div id="agent-list-container"></div>
             </div>
-            <div class="wallet-card">
-                <label>钻石 (分成收益)</label>
-                <span id="stat-diamonds">0</span>
-            </div>
-        </div>
-        <button class="btn-sub" style="color: #28a745; background: #e8f5e9;" onclick="addTestMoney()">【测试用】给自己充值 100 币</button>
-
-        <h2>发布智能体</h2>
-        <input type="text" id="agent-name" placeholder="智能体名称 (大号操作)">
-        <input type="number" id="agent-price" placeholder="价格 (Mist币)">
-        <button class="btn-main" onclick="publishAgent()">确认发布</button>
-
-        <h2 style="margin-top: 20px;">智能体市场</h2>
-        <div id="market-list" style="font-size: 0.8rem; color: #999; text-align: center;">正在同步数据...</div>
-    </div>
-</div>
-
-<script>
-    // 初始化 Supabase
-    const supabaseUrl = 'https://cbxtlwjpbmuniexcuzrp.supabase.co';
-    const supabaseKey = 'sb_publishable_Bsfqqe6VtGO_yFth6JyDLw_-SA4V3EM';
-    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
-
-    let sessionUser = null;
-
-    // 页面加载检查登录
-    window.onload = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            sessionUser = session.user;
-            showUI();
-        }
-    };
-
-    // 注册
-    async function signUp() {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('pw').value;
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) document.getElementById('auth-log').innerText = error.message;
-        else alert("注册发起！请去邮箱确认（或在后台关闭邮件确认）。");
-    }
-
-    // 登录
-    async function signIn() {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('pw').value;
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) document.getElementById('auth-log').innerText = error.message;
-        else { sessionUser = data.user; showUI(); }
-    }
-
-    // 退出
-    async function signOut() {
-        await supabase.auth.signOut();
-        location.reload();
-    }
-
-    // 显示界面并刷新数据
-    function showUI() {
-        document.getElementById('auth-panel').style.display = 'none';
-        document.getElementById('main-panel').style.display = 'block';
-        document.getElementById('user-email').innerText = sessionUser.email;
-        refreshData();
-    }
-
-    // 核心数据查询
-    async function refreshData() {
-        // 1. 获取余额
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', sessionUser.id)
-            .single();
-        
-        if (profile) {
-            document.getElementById('stat-coins').innerText = profile.mist_coins;
-            document.getElementById('stat-diamonds').innerText = profile.mist_diamond;
-        }
-
-        // 2. 获取市场列表
-        const { data: agents } = await supabase.from('agents').select('*');
-        const listDiv = document.getElementById('market-list');
-        listDiv.innerHTML = "";
-        
-        if (agents && agents.length > 0) {
-            agents.forEach(a => {
-                const item = document.createElement('div');
-                item.className = 'agent-item';
-                item.innerHTML = `
-                    <div class="agent-info">
-                        <strong>${a.name}</strong> <span class="status-tag">作者:${a.creator_id.substring(0,5)}</span><br>
-                        <span class="agent-price">${a.price} Mist币</span>
+            <div id="tab-style" class="tab-page">
+                <!-- 美化中心将由JavaScript动态渲染 -->
+                <div id="style-content" style="padding:20px;">
+                    <div style="text-align:center; padding-top:60px; color:#bdc3c7;">
+                        <i data-lucide="sparkles" style="width:48px; height:48px; margin:0 auto 10px; display:block; opacity:0.5;"></i>
+                        加载主题商城中...
                     </div>
-                    <button class="btn-main" style="width: 60px; padding: 5px; font-size: 0.7rem;" onclick="buyAgent('${a.id}')">购买</button>
-                `;
-                listDiv.appendChild(item);
-            });
-        } else {
-            listDiv.innerText = "市场空空如也，快去发布吧";
-        }
-    }
+                </div>
+            </div>
+            <!-- Tab Me -->
+            <div id="tab-me" class="tab-page">
+                <div class="settings-card" style="margin-top:15px; padding:20px 0; text-align:center;">
+                    <img id="my-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" style="width:70px; height:70px; border-radius:50%; border:1px solid #eee; margin: 0 auto; display: block;">
+                    <input type="text" id="my-name" value="MistUser" style="display:block; margin:10px auto 0; border:none; text-align:center; font-size:1.2rem; font-weight:bold; color:#2c3e50;">
+                </div>
+                <div class="settings-card">
+                    <div class="card-header">模型设置</div>
+                    <div class="field-row">
+                        <label class="field-label">API 地址</label>
+                        <input type="text" id="api-url" class="field-input" placeholder="https://api.deepseek.com">
+                    </div>
+                    <div class="field-row">
+                        <label class="field-label">API 密钥</label>
+                        <div class="input-group">
+                            <input type="password" id="api-key" class="field-input" placeholder="sk-...">
+                            <button class="btn-mini" id="conn-btn" onclick="fetchModels()">连接测试</button>
+                        </div>
+                    </div>
+                    <div class="field-row">
+                        <label class="field-label">当前模型</label>
+                        <div class="input-group">
+                            <input type="text" id="model-id" class="field-input" placeholder="选择或输入...">
+                        </div>
+                        <div class="model-list-pop" id="model-pop">
+                            <input type="text" placeholder="🔍 搜索模型..." style="width:100%; padding:8px; border:none; border-bottom:1px solid #eee;" onkeyup="filterModels(this.value)">
+                            <div id="model-list-ul"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-card">
+                    <div class="card-header">MiniMax 语音</div>
+                    <div class="field-row">
+                        <label class="field-label">Group ID</label>
+                        <input type="text" id="mm-group" class="field-input" placeholder="Group ID">
+                    </div>
+                    <div class="field-row">
+                        <label class="field-label">API Key</label>
+                        <input type="password" id="mm-key" class="field-input" placeholder="API Key">
+                    </div>
+                </div>
+                <!-- Save Button -->
+                <div class="normal-save-container">
+                    <button class="btn-save" onclick="saveGlobalSettings()">保存设置</button>
+                </div>
+            </div>
+        </div>
 
-    // 模拟加钱
-    async function addTestMoney() {
-        const { error } = await supabase
-            .from('profiles')
-            .update({ mist_coins: 100 })
-            .eq('id', sessionUser.id);
+        <div class="bottom-nav">
+            <div class="nav-item active" id="nav-msg" onclick="switchTab('msg', this)"><i data-lucide="message-circle"></i><span>消息</span></div>
+            <div class="nav-item" id="nav-style" onclick="switchTab('style', this)"><i data-lucide="palette"></i><span>美化</span></div>
+            <div class="nav-item" id="nav-me" onclick="switchTab('me', this)"><i data-lucide="user"></i><span>我</span></div>
+        </div>
+    </div>
+
+    <!-- 3. 智能体编辑器 -->
+    <div id="agent-editor">
+        <div class="editor-nav">
+            <div onclick="closeAgentEditor()" style="color:#e74c3c; cursor:pointer;">取消</div>
+            <div style="font-weight:bold;">编辑智能体</div>
+            <div onclick="saveAgent()" style="color:#27ae60; font-weight:bold; cursor:pointer;">完成</div>
+        </div>
+
+        <div class="visual-editor">
+            <div class="bg-upload-zone" onclick="document.getElementById('edit-bg-in').click()">
+                <div class="plus-icon" id="bg-plus"><i data-lucide="image-plus" color="white" size="32"></i></div>
+                <img id="bg-preview-img" style="display:none;">
+                <video id="bg-preview-video" muted loop style="display:none;"></video>
+            </div>
+            <div class="avatar-upload-zone" onclick="document.getElementById('edit-avatar-in').click()">
+                <div class="avatar-plus" id="av-plus"><i data-lucide="camera" color="#ccc"></i></div>
+                <img id="av-preview-img" style="display:none;">
+            </div>
+            <input type="file" id="edit-bg-in" hidden accept="image/*,video/*" onchange="handleFilePreview(this, 'bg')">
+            <input type="file" id="edit-avatar-in" hidden accept="image/*" onchange="handleFilePreview(this, 'avatar')">
+        </div>
+
+        <div class="editor-form">
+            <div class="form-section">
+                <div class="input-group">
+                    <input type="text" id="edit-name" class="edit-input" placeholder="智能体名字" style="flex:2;">
+                    <select id="edit-gender" class="edit-input">
+                        <option value="male">男</option>
+                        <option value="female">女</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-section">
+                <div class="section-label">音色 ID</div>
+                <input type="text" id="edit-voice" class="edit-input" placeholder="输入 Voice ID">
+            </div>
+            <div class="form-section">
+                <div class="section-label">Ta的设定</div>
+                <div class="textarea-wrapper">
+                    <div class="expand-btn" onclick="openFullscreen('edit-persona')"><i data-lucide="scan" size="14"></i></div>
+                    <textarea id="edit-persona" class="edit-area" placeholder="性格、经历、背景..." oninput="updateCount('persona', 5000)"></textarea>
+                </div>
+                <div class="char-limit"><span id="c-persona">0</span>/5000</div>
+            </div>
+            <div class="form-section">
+                <div class="section-label">对话风格</div>
+                <div class="textarea-wrapper">
+                    <div class="expand-btn" onclick="openFullscreen('edit-style')"><i data-lucide="scan" size="14"></i></div>
+                    <textarea id="edit-style" class="edit-area" placeholder="说话语气、口癖..." oninput="updateCount('style', 2000)"></textarea>
+                </div>
+                <div class="char-limit"><span id="c-style">0</span>/2000</div>
+            </div>
+            <div class="form-section">
+                <div class="section-label">联动人物</div>
+                <div class="textarea-wrapper">
+                    <div class="expand-btn" onclick="openFullscreen('edit-relation')"><i data-lucide="scan" size="14"></i></div>
+                    <textarea id="edit-relation" class="edit-area" placeholder="相关人物关系..." oninput="updateCount('relation', 3000)"></textarea>
+                </div>
+                <div class="char-limit"><span id="c-relation">0</span>/3000</div>
+            </div>
+            <div class="form-section">
+                <div class="section-label">开场白</div>
+                <div class="textarea-wrapper">
+                    <div class="expand-btn" onclick="openFullscreen('edit-opening')"><i data-lucide="scan" size="14"></i></div>
+                    <textarea id="edit-opening" class="edit-area" placeholder="Ta对你说的第一句话..." oninput="updateCount('opening', 1000)"></textarea>
+                </div>
+                <div class="char-limit"><span id="c-opening">0</span>/1000</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全屏输入 -->
+    <div id="fullscreen-editor">
+        <div class="fs-header">
+            <div class="fs-done" onclick="closeFullscreen()">完成</div>
+        </div>
+        <textarea id="fs-input-area" class="fs-input" placeholder="在此输入..."></textarea>
+    </div>
+
+    <!-- 4. 聊天室 -->
+    <div id="chat-room">
+        <div class="chat-bg-layer" id="chat-bg-container"></div>
+        <div class="chat-overlay"></div>
+        <div class="chat-header-trans">
+            <div onclick="closeChat()" style="cursor:pointer; padding:5px;"><i data-lucide="chevron-left" color="white"></i></div>
+            <div id="chat-title">Chat</div>
+            <div onclick="editCurrentAgent()" style="cursor:pointer; padding:5px;"><i data-lucide="edit-3" color="white" size="18"></i></div>
+        </div>
+        <div class="chat-main" id="chat-box"></div>
         
-        if (error) alert("加钱失败: " + error.message);
-        else refreshData();
-    }
+        <!-- More Panel -->
+        <div id="more-panel">
+            <div class="more-header">
+                更多功能
+                <div class="more-close" onclick="toggleMoreDrawer(false)"><i data-lucide="x"></i></div>
+            </div>
+            <!-- 修改后的顺序：召唤、推特、谷歌、淘宝、事件、自设、存档 -->
+            <div class="more-tabs">
+                <div class="more-tab active" onclick="jumpMoreTab('summon')"><i data-lucide="users"></i>召唤</div>
+                <div class="more-tab" onclick="jumpMoreTab('tweet')"><i data-lucide="twitter"></i>推特</div>
+                <div class="more-tab" onclick="jumpMoreTab('google')"><i data-lucide="chrome"></i>谷歌</div>
+                <div class="more-tab" onclick="jumpMoreTab('taobao')"><i data-lucide="shopping-bag"></i>淘宝</div>
+                <div class="more-tab" onclick="jumpMoreTab('event')"><i data-lucide="book"></i>事件</div>
+                <div class="more-tab" onclick="jumpMoreTab('user')"><i data-lucide="user-cog"></i>自设</div>
+                <div class="more-tab" onclick="jumpMoreTab('slot')"><i data-lucide="save"></i>存档</div>
+            </div>
+            
+            <!-- 召唤页（现在第一个） -->
+            <div id="mp-summon" class="more-content active">
+                <div class="more-inner-pad">
+                    <div style="font-size:0.85rem; color:#666; margin-bottom:10px;">召唤【联动人物】进行互动，生成的内容将影响下一句剧情走向。</div>
+                    <div id="summon-output" class="summon-box">
+                        <span style="opacity:0.5; font-style:italic;">(点击下方按钮召唤配角/旁白...)</span>
+                    </div>
+                    <div class="float-tweet-btn" style="background:#9b59b6;" onclick="generateSummon()">
+                        <i data-lucide="zap" class="w-5 h-5"></i>
+                    </div>
+                </div>
+            </div>
 
-    // 发布智能体
-    async function publishAgent() {
-        const name = document.getElementById('agent-name').value;
-        const price = document.getElementById('agent-price').value;
-        if(!name || !price) return alert("请填写完整");
+            <!-- 推特页（现在第二个） -->
+            <div id="mp-tweet" class="more-content" style="background:#000;">
+                <div class="twitter-container w-full max-w-[600px] mx-auto bg-black text-gray-200 relative">
+                    <div class="relative group">
+                        <label for="tw-banner-up" class="cursor-pointer block h-32 bg-gray-800 relative overflow-hidden">
+                            <img id="tw-banner" src="https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=1000" class="w-full h-full object-cover opacity-80">
+                            <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 transition">
+                                <i data-lucide="camera" class="text-white"></i>
+                            </div>
+                        </label>
+                        <input type="file" id="tw-banner-up" class="file-input" accept="image/*" onchange="previewImage(this, 'tw-banner')">
+                        <div class="px-4 relative -mt-10 flex justify-between items-end">
+                            <label for="tw-avatar-up" class="relative group cursor-pointer">
+                                <div class="w-20 h-20 rounded-full border-4 border-black overflow-hidden bg-gray-900">
+                                    <img id="tw-avatar" src="" class="w-full h-full object-cover">
+                                </div>
+                                <div class="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition">
+                                    <i data-lucide="camera" class="text-white w-5 h-5"></i>
+                                </div>
+                            </label>
+                            <input type="file" id="tw-avatar-up" class="file-input" accept="image/*" onchange="previewImage(this, 'tw-avatar')">
+                            <button class="bg-white text-black px-4 py-1.5 rounded-full font-bold text-sm mb-1">正在关注</button>
+                        </div>
+                    </div>
+                    <div class="px-4 py-3 border-b border-gray-800">
+                        <h1 class="text-lg font-bold text-white" id="tw-name">Agent Name</h1>
+                        <p class="text-gray-500 text-sm" id="tw-handle">@agent_id</p>
+                        <p class="mt-2 text-[14px] text-gray-300" id="tw-bio">Loading bio...</p>
+                        <div class="flex gap-4 mt-2 text-xs text-gray-500">
+                            <span class="flex items-center gap-1"><i data-lucide="map-pin" class="w-3 h-3"></i> Tokyo, Japan</span>
+                            <span class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> 2023年加入</span>
+                        </div>
+                    </div>
+                    <div class="flex font-bold border-b border-gray-800 text-sm">
+                        <div class="flex-1 text-center py-3 text-white border-b-2 border-[#1d9bf0]">帖子</div>
+                        <div class="flex-1 text-center py-3 text-gray-500">回复</div>
+                        <div class="flex-1 text-center py-3 text-gray-500">媒体</div>
+                    </div>
+                    <div id="tweet-list-render"></div>
+                    <div class="float-tweet-btn" onclick="generateSocialPost()">
+                        <i data-lucide="sparkles" class="w-5 h-5"></i>
+                    </div>
+                </div>
+            </div>
 
-        const { error } = await supabase.from('agents').insert([
-            { name, price: parseFloat(price), creator_id: sessionUser.id }
-        ]);
+            <!-- Google -->
+            <div id="mp-google" class="more-content">
+                <div class="google-container w-full max-w-[500px] mx-auto">
+                    <div class="google-header">
+                        <div class="fake-search-bar">
+                            <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+                            <input type="text" placeholder="搜索你的活动记录" disabled>
+                            <i data-lucide="mic" class="w-4 h-4 text-blue-400"></i>
+                        </div>
+                    </div>
+                    <div class="google-subheader">
+                        <span>最近的搜索活动</span>
+                        <i data-lucide="info" class="w-3 h-3"></i>
+                    </div>
+                    <div id="browser-list-render">
+                        <div style="padding:40px; text-align:center; color:#5f6368; font-size:0.9rem;">暂无搜索记录</div>
+                    </div>
+                    <div class="float-tweet-btn" style="background:#4285f4;" onclick="generateSearchHistory()">
+                        <i data-lucide="search" class="w-5 h-5"></i>
+                    </div>
+                </div>
+            </div>
 
-        if (error) alert("发布失败: " + error.message);
-        else { alert("发布成功！"); refreshData(); }
-    }
+            <!-- Taobao (New) -->
+            <div id="mp-taobao" class="more-content">
+                <div class="tb-container w-full max-w-[480px] mx-auto">
+                    <div class="flex items-center justify-between mb-4 px-2">
+                        <h1 class="text-xl font-bold">我的订单</h1>
+                        <div class="flex gap-4 text-gray-500">
+                            <i data-lucide="search" class="w-5 h-5"></i>
+                            <i data-lucide="list-filter" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+                    <div class="flex justify-around bg-white py-3 rounded-xl mb-4 shadow-sm text-sm">
+                        <div class="flex flex-col items-center gap-1"><i data-lucide="wallet" class="w-5 h-5 text-gray-600"></i><span>待付款</span></div>
+                        <!-- Dynamic Badge Here -->
+                        <div class="flex flex-col items-center gap-1 relative">
+                            <i data-lucide="package" class="w-5 h-5 text-gray-600"></i>
+                            <span>待发货</span>
+                            <span id="tb-badge" class="absolute -top-1 -right-2 bg-tb-orange text-white text-[10px] px-1 rounded-full" style="display:none;">0</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-1"><i data-lucide="truck" class="w-5 h-5 text-gray-600"></i><span>待收货</span></div>
+                        <div class="flex flex-col items-center gap-1 text-tb-orange font-bold"><i data-lucide="message-square-more" class="w-5 h-5"></i><span>待评价</span></div>
+                    </div>
+                    
+                    <div id="tb-list-render">
+                        <div style="padding:40px; text-align:center; color:#999; font-size:0.9rem;">暂无新订单</div>
+                    </div>
 
-    // 购买智能体 (核心：调用 RPC 函数)
-    async function buyAgent(agentId) {
-        const { data, error } = await supabase.rpc('buy_agent', { target_agent_id: agentId });
+                    <div class="float-tweet-btn" style="background:#ff5000;" onclick="generateTaobaoOrder()">
+                        <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 事件簿 -->
+            <div id="mp-event" class="more-content">
+                <div class="more-inner-pad">
+                    <div class="textarea-wrapper">
+                        <div class="expand-btn" onclick="openFullscreen('event-book')"><i data-lucide="scan" size="14"></i></div>
+                        <textarea id="event-book" class="edit-area" style="height:200px;" placeholder="AI自动总结记忆区域..." oninput="updateMemoryData(this.value)"></textarea>
+                    </div>
+                    <div class="char-limit"><span id="c-event">0</span>/5000</div>
+                    <p style="font-size:0.75rem; color:#999; margin-top:5px;">* AI会自动总结，超限将遗忘最旧记忆。</p>
+                </div>
+            </div>
+            
+            <!-- 自设 -->
+            <div id="mp-user" class="more-content">
+                <div class="more-inner-pad">
+                    <div class="textarea-wrapper">
+                        <div class="expand-btn" onclick="openFullscreen('user-persona')"><i data-lucide="scan" size="14"></i></div>
+                        <textarea id="user-persona" class="edit-area" style="height:200px;" placeholder="在此设定您在这个故事中扮演的角色..." oninput="updateUserPersona(this.value)"></textarea>
+                    </div>
+                    <div class="char-limit"><span id="c-userp">0</span>/5000</div>
+                </div>
+            </div>
+
+            <!-- 存档 -->
+            <div id="mp-slot" class="more-content">
+                <div class="more-inner-pad">
+                    <p style="text-align:center; color:#7f8c8d; font-size:0.9rem;">切换存档将重置当前聊天视图</p>
+                    <div class="slot-container">
+                        <div class="save-slot active" id="slot-0" onclick="switchSlot(0)">
+                            <i data-lucide="folder" size="24"></i><small>存档 1</small><div class="slot-badge"></div>
+                        </div>
+                        <div class="save-slot" id="slot-1" onclick="switchSlot(1)">
+                            <i data-lucide="folder" size="24"></i><small>存档 2</small><div class="slot-badge"></div>
+                        </div>
+                        <div class="save-slot" id="slot-2" onclick="switchSlot(2)">
+                            <i data-lucide="folder" size="24"></i><small>存档 3</small><div class="slot-badge"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="swipe-handle-bar">
+                <div class="swipe-indicator"></div>
+            </div>
+        </div>
+
+        <div class="chat-footer">
+            <input type="text" id="msg-in" placeholder="发送消息..." onkeypress="if(event.keyCode===13) sendMsg()">
+            <div class="icon-btn send-btn" onclick="sendMsg()">
+                <i data-lucide="send-horizontal"></i>
+            </div>
+            <div class="icon-btn" onclick="toggleMoreDrawer(true)">
+                <i data-lucide="layout-grid"></i>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let agents = []; 
+        let currentAgentIdx = -1;
+        let editingAgentIdx = -1; 
+        let currentSlot = 0; 
+        let allModels = [];
+        let activeTextareaId = '';
+        let tempBlobAvatar = null;
+        let tempBlobBg = null;
+        let tempBgType = 'img';
         
-        if (error) {
-            alert("RPC 调用失败 (请检查 SQL 函数是否创建成功): " + error.message);
-        } else {
-            if (data.success) {
-                alert("购买成功！" + data.message);
-            } else {
-                alert("失败: " + data.message);
+        // 修改后的顺序：召唤、推特、谷歌、淘宝、事件、自设、存档
+        const drawerTabs = ['summon', 'tweet', 'google', 'taobao', 'event', 'user', 'slot'];
+        let currentDrawerTabIdx = 0; // Default: summon
+
+        let tempSummonContext = "";
+        let autoSummaryCounter = 0; // 用于记录对话轮次，用于自动总结
+        const SUMMARY_INTERVAL = 5; // 每5轮对话自动总结一次
+
+        // 美化商城数据 - 只保留红玫瑰主题
+        const mallThemes = [
+            {
+                name: "红玫瑰",
+                preview: "https://gitee.com/mistcall/mc/raw/master/IMG_2320.jpeg",
+                jsonUrl: "https://gitee.com/mistcall/mc/raw/master/theme_red_rose.json"
             }
-            refreshData();
-        }
-    }
-</script>
+        ];
 
+        // 红玫瑰主题备用配置 - 添加UI透明配置
+        function getRedRoseFallback() {
+            return {
+                id: "red_rose",
+                name: "红玫瑰",
+                preview: "https://gitee.com/mistcall/mc/raw/master/IMG_2320.jpeg",
+                config: {
+                    ui: {
+                        header_bg: "rgba(255,255,255,0.8)",
+                        nav_bg: "rgba(255,255,255,0.95)",
+                        card_bg: "rgba(255,255,255,0.9)",
+                        blur: "8px",
+                        text_main: "#1e293b",
+                        text_sub: "#94a3b8",
+                        icon_size: "24px"
+                    },
+                    colors: {
+                        main_text: "#ffffff",
+                        input_text: "#333333",
+                        nav_active: "#ff4d4d"
+                    },
+                    backgrounds: {
+                        page_bg: "https://gitee.com/mistcall/mc/raw/master/IMG_2322.jpeg",
+                        msg_tab_bg: "https://gitee.com/mistcall/mc/raw/master/IMG_2318.jpeg",
+                        style_tab_bg: "https://gitee.com/mistcall/mc/raw/master/IMG_2316.jpeg",
+                        input_box_bg: "https://gitee.com/mistcall/mc/raw/master/IMG_2321.jpeg"
+                    },
+                    icons: {
+                        msg: "https://gitee.com/mistcall/mc/raw/master/IMG_2314.png",
+                        style: "https://gitee.com/mistcall/mc/raw/master/IMG_2313.png",
+                        me: "https://gitee.com/mistcall/mc/raw/master/IMG_2317.png"
+                    },
+                    bubbles: {
+                        bot: {
+                            img: "https://gitee.com/mistcall/mc/raw/master/IMG_2319.png",
+                            slice: "41 158 48 26 fill",
+                            width: "41px 158px 48px 26px",
+                            padding: "10px 60px 10px 20px",
+                            minHeight: "100px",
+                            textColor: "#ffffff"
+                        },
+                        user: {
+                            img: "https://gitee.com/mistcall/mc/raw/master/IMG_2315.png",
+                            slice: "122 152 173 113 fill",
+                            width: "122px 152px 173px 113px",
+                            padding: "60px 80px 80px 60px",
+                            minHeight: "150px",
+                            textColor: "#ffffff"
+                        }
+                    }
+                }
+            };
+        }
+
+        // 渲染商城列表 - 修改：缩小预览图
+        function renderMall() {
+            const container = document.getElementById('style-content');
+            container.innerHTML = `
+                <div style="padding:20px;">
+                    <h2 style="font-size:1.2rem; font-weight:bold; margin-bottom:20px; color:#2c3e50; text-align:center;">主题商城</h2>
+                    <div class="grid grid-cols-2 gap-4">
+                        ${mallThemes.map(t => `
+                            <div class="bg-white rounded-xl overflow-hidden shadow-md border border-gray-200">
+                                <img src="${t.preview}" class="w-full h-32 object-cover" style="height:128px;">
+                                <div class="p-3 text-center">
+                                    <div class="font-bold text-sm mb-2">${t.name}</div>
+                                    <button onclick="installTheme('${t.jsonUrl}')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors">安装并换肤</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div style="margin-top:30px; padding:15px; background:#f8f9fa; border-radius:8px;">
+                        <h3 class="font-bold text-sm mb-2">如何使用主题？</h3>
+                        <p class="text-xs text-gray-600">1. 点击"安装并换肤"按钮安装主题</p>
+                        <p class="text-xs text-gray-600">2. 主题会自动应用到当前界面</p>
+                        <p class="text-xs text-gray-600">3. 切换回"消息"标签查看效果</p>
+                        <p class="text-xs text-gray-600 mt-2 text-red-500">* 如果主题加载失败，会自动使用备用配置</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 核心：安装主题逻辑 - 更新为支持沉浸式UI
+        async function installTheme(url) {
+            let themeData = null;
+            const btn = document.querySelector('#style-content button');
+            
+            try {
+                if (btn) {
+                    btn.innerText = "安装中...";
+                    btn.disabled = true;
+                }
+                
+                // 尝试从网络加载主题
+                try {
+                    const res = await fetch(url, {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    if (!res.ok) {
+                        throw new Error(`HTTP错误: ${res.status}`);
+                    }
+                    
+                    themeData = await res.json();
+                    console.log('从网络加载主题成功:', themeData);
+                } catch (networkError) {
+                    console.warn('网络加载失败，使用备用配置:', networkError);
+                    // 使用备用配置
+                    themeData = getRedRoseFallback();
+                    console.log('使用备用主题配置:', themeData);
+                }
+                
+                applyTheme(themeData);
+                
+                alert('"红玫瑰"主题安装成功！请切换到"消息"标签查看效果。');
+                
+            } catch (e) {
+                console.error('主题安装失败:', e);
+                alert(`主题安装失败: ${e.message}\n已自动使用备用配置。`);
+            } finally {
+                if (btn) {
+                    btn.innerText = "安装并换肤";
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        // 应用主题函数 - 沉浸式UI版本
+        function applyTheme(themeData) {
+            const theme = themeData.config || themeData;
+            const root = document.documentElement;
+
+            // 1. 应用沉浸式 UI (透明度、模糊、文字颜色)
+            if(theme.ui) {
+                root.style.setProperty('--ui-header-bg', theme.ui.header_bg);
+                root.style.setProperty('--ui-nav-bg', theme.ui.nav_bg);
+                root.style.setProperty('--ui-card-bg', theme.ui.card_bg);
+                root.style.setProperty('--ui-text-main', theme.ui.text_main);
+                root.style.setProperty('--ui-text-sub', theme.ui.text_sub);
+                root.style.setProperty('--ui-blur', theme.ui.blur);
+                root.style.setProperty('--ui-icon-size', theme.ui.icon_size);
+                
+                // 同时设置原有的变量（向后兼容）
+                root.style.setProperty('--header-bg', theme.ui.header_bg);
+                root.style.setProperty('--nav-bg', theme.ui.nav_bg);
+                root.style.setProperty('--card-bg', theme.ui.card_bg);
+                root.style.setProperty('--text-color', theme.ui.text_main);
+                root.style.setProperty('--ui-blur', theme.ui.blur);
+            }
+
+            // 2. 应用底图
+            if (theme.backgrounds) {
+                root.style.setProperty('--page-bg-img', `url(${theme.backgrounds.page_bg})`);
+                // 同时设置原有的背景变量
+                root.style.setProperty('--page-bg', `url('${theme.backgrounds.page_bg}')`);
+                if (theme.backgrounds.msg_tab_bg) {
+                    root.style.setProperty('--msg-bg', `url('${theme.backgrounds.msg_tab_bg}')`);
+                }
+                if (theme.backgrounds.style_tab_bg) {
+                    root.style.setProperty('--style-bg', `url('${theme.backgrounds.style_tab_bg}')`);
+                }
+                if (theme.backgrounds.input_box_bg) {
+                    root.style.setProperty('--input-bg', `url('${theme.backgrounds.input_box_bg}')`);
+                }
+            }
+
+            // 3. 应用气泡 (使用 JSON 里的新数值)
+            if (theme.bubbles) {
+                const b = theme.bubbles;
+                
+                // 机器人气泡
+                if (b.bot) {
+                    root.style.setProperty('--bot-bubble-img', `url(${b.bot.img})`);
+                    root.style.setProperty('--bot-bubble-slice', b.bot.slice);
+                    root.style.setProperty('--bot-bubble-width', b.bot.width);
+                    root.style.setProperty('--bot-bubble-padding', b.bot.padding);
+                    root.style.setProperty('--bot-min-h', b.bot.minHeight);
+                    root.style.setProperty('--bot-text-color', b.bot.textColor);
+                    
+                    // 同时设置原有的气泡变量（向后兼容）
+                    root.style.setProperty('--bot-bubble-img', `url('${b.bot.img}')`);
+                    root.style.setProperty('--bot-bubble-slice', b.bot.slice);
+                    root.style.setProperty('--bot-bubble-width', b.bot.width);
+                    root.style.setProperty('--bot-bubble-padding', b.bot.padding);
+                    root.style.setProperty('--bot-bubble-min-height', b.bot.minHeight);
+                    root.style.setProperty('--bot-bubble-text-color', b.bot.textColor);
+                }
+                
+                // 用户气泡
+                if (b.user) {
+                    root.style.setProperty('--user-bubble-img', `url(${b.user.img})`);
+                    root.style.setProperty('--user-bubble-slice', b.user.slice);
+                    root.style.setProperty('--user-bubble-width', b.user.width);
+                    root.style.setProperty('--user-bubble-padding', b.user.padding);
+                    root.style.setProperty('--user-min-h', b.user.minHeight);
+                    root.style.setProperty('--user-text-color', b.user.textColor);
+                    
+                    // 同时设置原有的气泡变量（向后兼容）
+                    root.style.setProperty('--user-bubble-img', `url('${b.user.img}')`);
+                    root.style.setProperty('--user-bubble-slice', b.user.slice);
+                    root.style.setProperty('--user-bubble-width', b.user.width);
+                    root.style.setProperty('--user-bubble-padding', b.user.padding);
+                    root.style.setProperty('--user-bubble-min-height', b.user.minHeight);
+                    root.style.setProperty('--user-bubble-text-color', b.user.textColor);
+                }
+            }
+
+            // 4. 替换图标
+            if (theme.icons) {
+                const msgIcon = document.getElementById('nav-msg');
+                const styleIcon = document.getElementById('nav-style');
+                const meIcon = document.getElementById('nav-me');
+                
+                if (msgIcon) {
+                    msgIcon.innerHTML = `<img src="${theme.icons.msg}" style="width:42px; height:42px; object-fit:contain; margin-bottom:-2px;"><span>消息</span>`;
+                }
+                if (styleIcon) {
+                    styleIcon.innerHTML = `<img src="${theme.icons.style}" style="width:42px; height:42px; object-fit:contain; margin-bottom:-2px;"><span>美化</span>`;
+                }
+                if (meIcon) {
+                    meIcon.innerHTML = `<img src="${theme.icons.me}" style="width:42px; height:42px; object-fit:contain; margin-bottom:-2px;"><span>我</span>`;
+                }
+            }
+            
+            // 保存主题到本地存储
+            localStorage.setItem('saved_theme', JSON.stringify(theme));
+            
+            // 重新创建图标
+            setTimeout(() => lucide.createIcons(), 100);
+        }
+
+        function enterApp() {
+            document.getElementById('cover-page').style.opacity = 0;
+            setTimeout(() => {
+                document.getElementById('cover-page').style.display = 'none';
+                document.getElementById('main-app').style.display = 'flex';
+                document.getElementById('header-plus').style.display = 'flex'; 
+                setTimeout(() => document.getElementById('main-app').style.opacity = 1, 50);
+                lucide.createIcons();
+                initSwipeTabs();
+                
+                // 初始化美化商城
+                renderMall();
+            }, 600);
+            loadSettings();
+        }
+
+        function switchTab(tab, el) {
+            document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            el.classList.add('active');
+            document.getElementById('nav-title').innerText = {'msg':'消息', 'style':'美化', 'me':'我'}[tab];
+            
+            if(tab === 'msg') {
+                document.getElementById('header-plus').style.display = 'flex';
+                document.getElementById('header-right-space').style.display = 'none';
+            } else {
+                document.getElementById('header-plus').style.display = 'none';
+                document.getElementById('header-right-space').style.display = 'block';
+            }
+            
+            // 切换到美化标签时重新渲染商城
+            if (tab === 'style') {
+                renderMall();
+            }
+        }
+
+        /* --- Msg Swipe & Pin Logic --- */
+        function renderAgents() {
+            const con = document.getElementById('agent-list-container');
+            con.innerHTML = '';
+            
+            const sortedIndices = agents.map((_, i) => i).sort((a, b) => {
+                const pinA = agents[a].isPinned ? 1 : 0;
+                const pinB = agents[b].isPinned ? 1 : 0;
+                return pinB - pinA; 
+            });
+
+            sortedIndices.forEach((realIdx) => {
+                const a = agents[realIdx];
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-cell-wrapper';
+                
+                const content = document.createElement('div');
+                content.className = 'msg-cell-content';
+                if(a.isPinned) content.classList.add('is-pinned');
+                content.onclick = () => openChat(realIdx);
+                content.innerHTML = `
+                    <img src="${a.avatar}" class="cell-avatar">
+                    <div class="cell-content">
+                        <h3>${a.name} <i data-lucide="pin" class="pin-icon"></i></h3>
+                        <p>${a.opening || '暂无开场白...'}</p>
+                    </div>
+                `;
+
+                const actions = document.createElement('div');
+                actions.className = 'msg-cell-actions';
+                actions.innerHTML = `
+                    <div class="swipe-btn btn-pin" onclick="togglePin(${realIdx})">${a.isPinned ? '取消' : '置顶'}</div>
+                    <div class="swipe-btn btn-del" onclick="deleteAgent(${realIdx})">删除</div>
+                `;
+
+                wrapper.appendChild(actions);
+                wrapper.appendChild(content);
+                con.appendChild(wrapper);
+
+                let startX, currentX;
+                content.addEventListener('touchstart', e => { startX = e.touches[0].clientX; });
+                content.addEventListener('touchmove', e => {
+                    currentX = e.touches[0].clientX;
+                    let diff = currentX - startX;
+                    if(diff < 0 && diff > -140) {
+                        content.style.transform = `translateX(${diff}px)`;
+                    }
+                });
+                content.addEventListener('touchend', e => {
+                    let diff = currentX - startX;
+                    if(diff < -60) {
+                        content.style.transform = `translateX(-140px)`; 
+                    } else {
+                        content.style.transform = `translateX(0)`;
+                    }
+                });
+            });
+            lucide.createIcons();
+        }
+
+        function togglePin(idx) {
+            agents.forEach((a, i) => {
+                if(i !== idx) a.isPinned = false;
+            });
+            if(!agents[idx].isPinned) agents[idx].isPinned = true;
+            else agents[idx].isPinned = false;
+            renderAgents();
+        }
+
+        function deleteAgent(idx) {
+            if(confirm("确认删除该智能体？")) {
+                agents.splice(idx, 1);
+                renderAgents();
+            } else {
+                renderAgents(); 
+            }
+        }
+
+        /* --- Drawer Swipe Logic --- */
+        function initSwipeTabs() {
+            const panel = document.getElementById('more-panel');
+            let startX, startY;
+            panel.addEventListener('touchstart', e => {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            });
+            panel.addEventListener('touchmove', e => {
+                let diffX = e.touches[0].clientX - startX;
+                let diffY = e.touches[0].clientY - startY;
+                
+                // 检测向下滑动（关闭手势）
+                if (diffY > 50 && Math.abs(diffY) > Math.abs(diffX)) {
+                    // 向下滑动超过50像素，关闭面板
+                    toggleMoreDrawer(false);
+                    return;
+                }
+            });
+            panel.addEventListener('touchend', e => {
+                let diffX = e.changedTouches[0].clientX - startX;
+                let diffY = e.changedTouches[0].clientY - startY;
+                
+                // Ensure horizontal swipe
+                if(Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                    if(diffX > 0) { // Swipe Right -> Prev Tab
+                        if(currentDrawerTabIdx > 0) jumpMoreTab(drawerTabs[currentDrawerTabIdx - 1]);
+                    } else { // Swipe Left -> Next Tab
+                        if(currentDrawerTabIdx < drawerTabs.length - 1) jumpMoreTab(drawerTabs[currentDrawerTabIdx + 1]);
+                    }
+                }
+            });
+        }
+        
+        function jumpMoreTab(tabName) {
+            currentDrawerTabIdx = drawerTabs.indexOf(tabName);
+            document.querySelectorAll('.more-tab').forEach(x => x.classList.remove('active'));
+            document.querySelectorAll('.more-tab')[currentDrawerTabIdx].classList.add('active');
+            document.querySelectorAll('.more-content').forEach(x => x.classList.remove('active'));
+            document.getElementById('mp-' + tabName).classList.add('active');
+            // Auto scroll nav into view
+            document.querySelectorAll('.more-tab')[currentDrawerTabIdx].scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"});
+            lucide.createIcons();
+        }
+
+        /* --- Standard Functions --- */
+        function cleanBaseUrl(url) {
+            url = url.trim().replace(/\/+$/, '');
+            if (url.endsWith('/chat/completions')) return url.replace('/chat/completions', '');
+            if (url.endsWith('/models')) return url.replace('/models', '');
+            return url;
+        }
+
+        async function fetchModels() {
+            let url = document.getElementById('api-url').value;
+            const key = document.getElementById('api-key').value.trim();
+            const btn = document.getElementById('conn-btn');
+            const pop = document.getElementById('model-pop');
+            if(!url || !key) { alert('请输入地址和密钥'); return; }
+            btn.innerText = "连接中...";
+            let base = cleanBaseUrl(url);
+            let target = base;
+            if (target.endsWith('/v1')) target += '/models';
+            else target += '/v1/models';
+            try {
+                const res = await fetch(target, { headers: { 'Authorization': `Bearer ${key}` } });
+                if (!res.ok) throw new Error(res.status);
+                const data = await res.json();
+                if(data.data) {
+                    allModels = data.data;
+                    renderModelList(allModels);
+                    pop.classList.add('show');
+                    btn.innerText = "成功";
+                    btn.className = "btn-mini success";
+                    alert("连接成功！共加载了 " + allModels.length + " 个模型。");
+                } else throw new Error("无数据");
+            } catch(e) {
+                btn.innerText = "失败";
+                alert("连接失败: " + e.message);
+                allModels = [{id:'gpt-3.5-turbo'},{id:'gpt-4'},{id:'deepseek-chat'}];
+                renderModelList(allModels);
+                pop.classList.add('show');
+            }
+        }
+        
+        function renderModelList(list) {
+            const ul = document.getElementById('model-list-ul');
+            ul.innerHTML = '';
+            list.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'model-opt';
+                div.innerText = m.id;
+                div.onclick = () => { document.getElementById('model-id').value = m.id; document.getElementById('model-pop').classList.remove('show'); };
+                ul.appendChild(div);
+            });
+        }
+        function filterModels(kw) { renderModelList(allModels.filter(m => m.id.toLowerCase().includes(kw.toLowerCase()))); }
+
+        function updateCount(id, max) { 
+            const val = document.getElementById('edit-' + id) ? document.getElementById('edit-' + id).value : document.getElementById(id).value;
+            document.getElementById('c-' + id.replace('edit-','')).innerText = val.length; 
+        }
+
+        function openFullscreen(id) {
+            activeTextareaId = id;
+            document.getElementById('fs-input-area').value = document.getElementById(id).value;
+            document.getElementById('fullscreen-editor').classList.add('open');
+        }
+
+        function closeFullscreen() {
+            if(activeTextareaId) {
+                const val = document.getElementById('fs-input-area').value;
+                document.getElementById(activeTextareaId).value = val;
+                if(activeTextareaId === 'event-book') updateMemoryData(val);
+                else if(activeTextareaId === 'user-persona') updateUserPersona(val);
+                else updateCount(activeTextareaId.replace('edit-', ''), 5000);
+            }
+            document.getElementById('fullscreen-editor').classList.remove('open');
+        }
+
+        function openAgentEditor(idx) {
+            editingAgentIdx = idx;
+            tempBlobAvatar = null; tempBlobBg = null; tempBgType = 'img';
+            document.getElementById('bg-plus').style.display = 'flex';
+            document.getElementById('bg-preview-img').style.display = 'none';
+            document.getElementById('bg-preview-video').style.display = 'none';
+            document.getElementById('av-plus').style.display = 'flex';
+            document.getElementById('av-preview-img').style.display = 'none';
+
+            if(idx > -1) {
+                const a = agents[idx];
+                document.getElementById('edit-name').value = a.name;
+                document.getElementById('edit-gender').value = a.gender;
+                document.getElementById('edit-voice').value = a.voiceId || '';
+                document.getElementById('edit-persona').value = a.persona || '';
+                document.getElementById('edit-style').value = a.style || '';
+                document.getElementById('edit-relation').value = a.relation || '';
+                document.getElementById('edit-opening').value = a.opening || '';
+                
+                if(a.avatar) {
+                    document.getElementById('av-preview-img').src = a.avatar;
+                    document.getElementById('av-preview-img').style.display = 'block';
+                    document.getElementById('av-plus').style.display = 'none';
+                    tempBlobAvatar = a.avatar;
+                }
+                if(a.bgSrc) {
+                    tempBlobBg = a.bgSrc;
+                    tempBgType = a.bgType;
+                    if(a.bgType === 'video') {
+                        const v = document.getElementById('bg-preview-video');
+                        v.src = a.bgSrc; v.style.display = 'block';
+                        document.getElementById('bg-preview-img').style.display = 'none';
+                    } else {
+                        const i = document.getElementById('bg-preview-img');
+                        i.src = a.bgSrc; i.style.display = 'block';
+                        document.getElementById('bg-preview-video').style.display = 'none';
+                    }
+                    document.getElementById('bg-plus').style.display = 'none';
+                }
+            } else {
+                ['name','voice','persona','style','relation','opening'].forEach(id => document.getElementById('edit-'+id).value = '');
+            }
+            ['persona','style','relation','opening'].forEach(id => updateCount(id));
+            document.getElementById('agent-editor').style.display = 'flex';
+            setTimeout(() => document.getElementById('agent-editor').classList.add('open'), 10);
+            lucide.createIcons();
+        }
+
+        function closeAgentEditor() {
+            document.getElementById('agent-editor').classList.remove('open');
+            setTimeout(() => document.getElementById('agent-editor').style.display = 'none', 300);
+        }
+
+        function handleFilePreview(input, type) {
+            if(input.files && input.files[0]) {
+                const url = URL.createObjectURL(input.files[0]);
+                if(type === 'avatar') {
+                    tempBlobAvatar = url;
+                    const img = document.getElementById('av-preview-img');
+                    img.src = url; img.style.display = 'block';
+                    document.getElementById('av-plus').style.display = 'none';
+                } else {
+                    tempBlobBg = url;
+                    const isVideo = input.files[0].type.startsWith('video');
+                    tempBgType = isVideo ? 'video' : 'img';
+                    if(isVideo) {
+                        const v = document.getElementById('bg-preview-video');
+                        v.src = url; v.style.display = 'block'; v.play();
+                        document.getElementById('bg-preview-img').style.display = 'none';
+                    } else {
+                        const i = document.getElementById('bg-preview-img');
+                        i.src = url; i.style.display = 'block';
+                        document.getElementById('bg-preview-video').style.display = 'none';
+                    }
+                    document.getElementById('bg-plus').style.display = 'none';
+                }
+            }
+        }
+
+        function saveAgent() {
+            const name = document.getElementById('edit-name').value;
+            if(!name) { alert('请填写名字'); return; }
+            const initSlots = () => ({ 
+                0: {history:[], memory:"", userPersona:"", tweets:[], searchHistory:[]}, 
+                1: {history:[], memory:"", userPersona:"", tweets:[], searchHistory:[]}, 
+                2: {history:[], memory:"", userPersona:"", tweets:[], searchHistory:[]} 
+            });
+            const data = {
+                name: name,
+                gender: document.getElementById('edit-gender').value,
+                voiceId: document.getElementById('edit-voice').value,
+                persona: document.getElementById('edit-persona').value,
+                style: document.getElementById('edit-style').value,
+                relation: document.getElementById('edit-relation').value,
+                opening: document.getElementById('edit-opening').value,
+                avatar: tempBlobAvatar || 'https://api.dicebear.com/7.x/bottts/svg?seed='+name,
+                bgSrc: tempBlobBg,
+                bgType: tempBgType,
+                isPinned: false, 
+                slots: (editingAgentIdx > -1 && agents[editingAgentIdx].slots) ? agents[editingAgentIdx].slots : initSlots()
+            };
+            if(editingAgentIdx > -1) {
+                data.isPinned = agents[editingAgentIdx].isPinned;
+                agents[editingAgentIdx] = data;
+                if(currentAgentIdx === editingAgentIdx) openChat(currentAgentIdx, true); 
+            } else {
+                agents.push(data);
+            }
+            renderAgents();
+            closeAgentEditor();
+        }
+
+        /* --- Chat Logic --- */
+        function openChat(idx, keepHistory = false) {
+            currentAgentIdx = idx;
+            const agent = agents[idx];
+            
+            const bgCon = document.getElementById('chat-bg-container');
+            bgCon.innerHTML = '';
+            if(agent.bgSrc) {
+                if(agent.bgType === 'video') {
+                    const v = document.createElement('video');
+                    v.src = agent.bgSrc; v.autoplay = true; v.loop = true; v.muted = true;
+                    v.style.width = '100%'; v.style.height = '100%'; v.style.objectFit = 'cover';
+                    bgCon.appendChild(v);
+                } else {
+                    bgCon.style.backgroundImage = `url(${agent.bgSrc})`;
+                    // Force background settings again in JS for safety
+                    bgCon.style.backgroundSize = 'cover';
+                    bgCon.style.backgroundPosition = 'center';
+                }
+            } else {
+                bgCon.style.background = '#eee';
+                bgCon.style.backgroundImage = 'none';
+            }
+
+            document.getElementById('chat-title').innerText = agent.name;
+            if(!agent.slots) agent.slots = { 
+                0: {history:[], memory:"", userPersona:"", tweets:[], searchHistory:[]}, 
+                1: {history:[], memory:"", userPersona:"", tweets:[], searchHistory:[]}, 
+                2: {history:[], memory:"", userPersona:"", tweets:[], searchHistory:[]} 
+            };
+            
+            loadSlotData(currentSlot);
+
+            // Twitter Init
+            document.getElementById('tw-avatar').src = agent.avatar;
+            document.getElementById('tw-name').innerText = agent.name;
+            document.getElementById('tw-handle').innerText = "@" + agent.name.toLowerCase().replace(/\s+/g, '_');
+            document.getElementById('tw-bio').innerText = agent.persona ? agent.persona.substring(0, 50) + "..." : "Based in Virtual World.";
+            renderTweets(); 
+            renderSearchHistory(); // Browser Init
+            
+            // Clear previous summon context on entry
+            tempSummonContext = "";
+            document.getElementById('summon-output').innerHTML = '<span style="opacity:0.5; font-style:italic;">(点击下方按钮召唤配角/旁白...)</span>';
+
+            // Clear Taobao UI for fresh session (no memory saved)
+            document.getElementById('tb-list-render').innerHTML = '<div style="padding:40px; text-align:center; color:#999; font-size:0.9rem;">暂无新订单</div>';
+            // Reset Taobao Badge for new chat entry
+            document.getElementById('tb-badge').innerText = '0';
+            document.getElementById('tb-badge').style.display = 'none';
+
+            document.getElementById('chat-room').style.display = 'flex';
+            setTimeout(()=>document.getElementById('chat-room').classList.add('open'),10);
+            
+            // Default open Summon tab if drawer was closed
+            jumpMoreTab('summon'); 
+            
+            lucide.createIcons();
+        }
+
+        function loadSlotData(slotId) {
+            currentSlot = slotId;
+            const agent = agents[currentAgentIdx];
+            const slotData = agent.slots[slotId];
+            if(!slotData.tweets) slotData.tweets = [];
+            if(!slotData.searchHistory) slotData.searchHistory = [];
+
+            document.querySelectorAll('.save-slot').forEach(el => el.classList.remove('active'));
+            document.getElementById('slot-'+slotId).classList.add('active');
+            [0,1,2].forEach(i => {
+                if(agent.slots[i].history.length > 0 || agent.slots[i].memory) 
+                    document.getElementById('slot-'+i).classList.add('has-data');
+                else document.getElementById('slot-'+i).classList.remove('has-data');
+            });
+
+            if(slotData.history.length === 0 && agent.opening) {
+                slotData.history.push({role: 'bot', content: agent.opening, memSnap: ""});
+            }
+
+            document.getElementById('event-book').value = slotData.memory;
+            document.getElementById('c-event').innerText = slotData.memory.length;
+            document.getElementById('user-persona').value = slotData.userPersona;
+            document.getElementById('c-userp').innerText = slotData.userPersona.length;
+
+            renderChat();
+            renderTweets();
+            renderSearchHistory();
+        }
+
+        function switchSlot(id) {
+            if(currentSlot === id) return;
+            loadSlotData(id);
+        }
+
+        function renderChat() {
+            const box = document.getElementById('chat-box');
+            box.innerHTML = '';
+            const history = agents[currentAgentIdx].slots[currentSlot].history;
+            const userAvatarSrc = document.getElementById('my-avatar').src;
+            const agent = agents[currentAgentIdx];
+
+            history.forEach((msg, index) => {
+                const isBot = msg.role === 'bot';
+                const row = document.createElement('div');
+                row.className = `chat-row ${isBot ? 'bot' : 'user'}`;
+                let contentHtml = `<div class="bubble ${isBot ? 'bubble-bot' : 'bubble-user'}">${msg.content}</div>`;
+                let toolbarHtml = '';
+                if(isBot) {
+                    toolbarHtml = `
+                    <div class="msg-actions">
+                        <div class="action-btn" onclick="doRespeak(${index})">重说</div>
+                        <div class="action-btn" onclick="playTTS('${msg.content.replace(/'/g, "\\'")}', '${agent.voiceId}')">语音</div>
+                        <div class="action-btn" onclick="doRewrite(${index})">改写</div>
+                    </div>`;
+                } else {
+                    toolbarHtml = `
+                    <div class="msg-actions">
+                        <div class="action-btn" onclick="doWithdraw(${index})">撤回</div>
+                    </div>`;
+                }
+                row.innerHTML = `<div class="chat-row-inner">${isBot ? `<img src="${agent.avatar}" class="chat-avatar">` : ''}${!isBot ? contentHtml : ''}${isBot ? contentHtml : ''}${!isBot ? `<img src="${userAvatarSrc}" class="chat-avatar">` : ''}</div>${toolbarHtml}`;
+                box.appendChild(row);
+            });
+            box.scrollTop = box.scrollHeight;
+            lucide.createIcons();
+        }
+
+        function editCurrentAgent() { openAgentEditor(currentAgentIdx); }
+        function closeChat() { document.getElementById('chat-room').classList.remove('open'); setTimeout(()=>document.getElementById('chat-room').style.display = 'none',300); }
+        function updateMemoryData(txt) { agents[currentAgentIdx].slots[currentSlot].memory = txt; document.getElementById('c-event').innerText = txt.length; }
+        function updateUserPersona(txt) { agents[currentAgentIdx].slots[currentSlot].userPersona = txt; document.getElementById('c-userp').innerText = txt.length; }
+
+        // 修改：事件自动记录改为像写小结一样，有详有略，而不是每句都记录
+        async function autoSummarizeMemory() {
+            const agent = agents[currentAgentIdx];
+            const s = agent.slots[currentSlot];
+            
+            // 如果对话历史少于3条，不进行总结
+            if (s.history.length < 3) {
+                return;
+            }
+            
+            // 获取最近的5条对话记录
+            const recentHistory = s.history.slice(-5);
+            
+            // 构建总结提示词
+            const summaryPrompt = `请对以下对话进行简要总结，突出重点事件和情感变化，有详有略，不要记录每句话：
+            
+            对话记录：
+            ${recentHistory.map(msg => `${msg.role === 'user' ? '用户' : agent.name}: ${msg.content}`).join('\n')}
+            
+            请用中文写一个简洁的总结，突出重要事件和情感变化：`;
+
+            let url = document.getElementById('api-url').value;
+            const key = document.getElementById('api-key').value;
+            const model = document.getElementById('model-id').value;
+
+            if(!model) return;
+
+            let base = cleanBaseUrl(url);
+            let target = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions';
+
+            try {
+                const res = await fetch(target, {
+                    method: 'POST',
+                    headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+                    body: JSON.stringify({ 
+                        model: model, 
+                        messages: [{role:'user', content: summaryPrompt}],
+                        max_tokens: 300
+                    })
+                });
+                
+                if(!res.ok) throw new Error(res.status);
+                const data = await res.json();
+                const summary = data.choices[0].message.content;
+                
+                // 将总结添加到现有记忆的末尾，用换行分隔
+                const currentMemory = s.memory || "";
+                const newMemory = currentMemory ? `${currentMemory}\n\n${summary}` : summary;
+                
+                // 限制记忆长度，避免过长
+                if (newMemory.length > 3000) {
+                    // 如果超过3000字符，只保留最近的总结
+                    s.memory = summary;
+                } else {
+                    s.memory = newMemory;
+                }
+                
+                // 更新事件簿显示
+                document.getElementById('event-book').value = s.memory;
+                document.getElementById('c-event').innerText = s.memory.length;
+                
+            } catch(e) {
+                console.error("自动总结失败:", e);
+            }
+        }
+
+        function doWithdraw(index) {
+            if(!confirm("确定撤回？")) return;
+            const s = agents[currentAgentIdx].slots[currentSlot];
+            if(index > 0 && s.history[index-1].memSnap) s.memory = s.history[index-1].memSnap;
+            else if (index === 0) s.memory = "";
+            s.history = s.history.slice(0, index);
+            renderChat();
+            document.getElementById('event-book').value = s.memory;
+        }
+        function doRewrite(index) {
+            const newText = prompt("修改回复内容：", agents[currentAgentIdx].slots[currentSlot].history[index].content);
+            if(newText) { agents[currentAgentIdx].slots[currentSlot].history[index].content = newText; renderChat(); }
+        }
+        function doRespeak(index) {
+            const s = agents[currentAgentIdx].slots[currentSlot];
+            if(index === 0 || s.history[index-1].role !== 'user') return;
+            const lastUserMsg = s.history[index-1].content;
+            s.history = s.history.slice(0, index);
+            renderChat();
+            callLLM(lastUserMsg); 
+        }
+
+        async function sendMsg() {
+            const input = document.getElementById('msg-in');
+            const txt = input.value.trim();
+            if(!txt) return;
+            const s = agents[currentAgentIdx].slots[currentSlot];
+            const currentMemSnap = s.memory; 
+            s.history.push({ role: 'user', content: txt, memSnap: currentMemSnap });
+            input.value = '';
+            renderChat();
+            await callLLM(txt);
+        }
+
+        async function callLLM(userTxt) {
+            const agent = agents[currentAgentIdx];
+            const s = agent.slots[currentSlot];
+            const box = document.getElementById('chat-box');
+            let url = document.getElementById('api-url').value;
+            const key = document.getElementById('api-key').value;
+            const model = document.getElementById('model-id').value;
+
+            if(!model) { s.history.push({role:'bot', content:'请先设置模型 ID'}); renderChat(); return; }
+
+            let sys = `你扮演${agent.name}。
+            [角色设定]: ${agent.persona}
+            [对话风格]: ${agent.style}
+            [人物关系]: ${agent.relation}
+            [用户设定]: ${s.userPersona}
+            [当前事件记忆]: ${s.memory}`;
+
+            if(tempSummonContext) {
+                sys += `\n\n[❗️当前场景发生的额外事件/联动人物动作]: ${tempSummonContext}\n(请根据此事件调整你的回复，与场景互动)`;
+            }
+
+            let contextMsgs = s.history.slice(-10).map(m => ({ role: m.role, content: m.content }));
+            let messages = [{role:'system', content: sys}, ...contextMsgs];
+            let base = cleanBaseUrl(url);
+            let target = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions';
+
+            const loadId = 'ld-' + Date.now();
+            const loadRow = document.createElement('div');
+            loadRow.id = loadId; loadRow.className = 'chat-row bot';
+            loadRow.innerHTML = `<div class="chat-row-inner"><img src="${agent.avatar}" class="chat-avatar"><div class="bubble bubble-bot">...</div></div>`;
+            box.appendChild(loadRow);
+            box.scrollTop = box.scrollHeight;
+            
+            try {
+                const res = await fetch(target, {
+                    method: 'POST',
+                    headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+                    body: JSON.stringify({ model: model, messages: messages })
+                });
+                if(!res.ok) throw new Error(res.status);
+                const data = await res.json();
+                document.getElementById(loadId).remove();
+                const reply = data.choices[0].message.content;
+                s.history.push({ role: 'bot', content: reply, memSnap: s.memory });
+                renderChat();
+                if(agent.voiceId) playTTS(reply, agent.voiceId);
+                
+                // 增加计数器，每5轮对话自动总结一次
+                autoSummaryCounter++;
+                if (autoSummaryCounter >= SUMMARY_INTERVAL) {
+                    autoSummaryCounter = 0;
+                    // 异步进行自动总结
+                    setTimeout(() => autoSummarizeMemory(), 1000);
+                }
+                
+            } catch(e) {
+                document.getElementById(loadId).remove();
+                alert("请求失败: " + e.message);
+            }
+        }
+
+        async function playTTS(text, vid) {
+            const gid = document.getElementById('mm-group').value;
+            const key = document.getElementById('mm-key').value;
+            if(!gid || !key) return;
+            try {
+                const res = await fetch(`https://api.minimax.chat/v1/text_to_speech?GroupId=${gid}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ voice_setting: { voice_id: vid, speed: 1, vol: 1, pitch: 0 }, audio_setting: { sample_rate: 32000, bitrate: 128000, format: "mp3", channel: 1 }, text: text, model: "speech-01" })
+                });
+                const blob = await res.blob();
+                new Audio(URL.createObjectURL(blob)).play();
+            } catch(e) {}
+        }
+
+        /* --- Twitter Logic --- */
+        function previewImage(input, targetId) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) { document.getElementById(targetId).src = e.target.result; }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function toggleLike(el) {
+            const icon = el.querySelector('.tw-like-icon');
+            const count = el.querySelector('.tw-like-count');
+            if(icon.classList.contains('like-anim')) {
+                icon.classList.remove('like-anim'); icon.style.fill = 'none'; icon.style.color = 'currentColor';
+                count.innerText = parseInt(count.innerText) - 1;
+            } else {
+                icon.classList.add('like-anim'); count.innerText = parseInt(count.innerText) + 1;
+            }
+        }
+
+        function renderTweets() {
+            const list = document.getElementById('tweet-list-render');
+            list.innerHTML = '';
+            const tweets = agents[currentAgentIdx].slots[currentSlot].tweets || [];
+            
+            tweets.forEach((tw, idx) => {
+                const div = document.createElement('div');
+                div.className = 'tweet-card';
+                
+                let commentsHtml = '';
+                tw.comments.forEach(c => {
+                    const hue = Math.floor(Math.random()*360);
+                    commentsHtml += `
+                    <div class="comment-item">
+                        <div class="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0" style="background-color:hsl(${hue}, 60%, 40%)"></div>
+                        <div>
+                            <div class="flex items-center gap-2"><span class="font-bold text-sm text-gray-300">${c.user}</span></div>
+                            <p class="text-sm text-gray-400 mt-0.5">${c.text}</p>
+                        </div>
+                    </div>`;
+                });
+
+                div.innerHTML = `
+                <div class="flex gap-3">
+                    <div class="w-10 h-10 rounded-full overflow-hidden bg-gray-800 shrink-0">
+                        <img src="${agents[currentAgentIdx].avatar}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-1">
+                            <span class="font-bold text-white text-[15px]">${agents[currentAgentIdx].name}</span>
+                            <span class="text-gray-500 text-sm">@${agents[currentAgentIdx].name} · ${tw.time}</span>
+                        </div>
+                        <p class="mt-1 text-[15px] leading-relaxed text-gray-200">${tw.content}</p>
+                        <div class="mt-3 aspect-video w-full bg-[#16181c] rounded-2xl border border-gray-800 flex flex-col items-center justify-center text-gray-500 p-4 text-center">
+                            <i data-lucide="image" class="w-8 h-8 mb-2 opacity-50"></i>
+                            <p class="text-xs text-gray-400 italic">📸 ${tw.image_desc}</p>
+                        </div>
+                        <div class="flex justify-between mt-3 text-gray-500 max-w-md pr-4">
+                            <div class="flex items-center gap-2 group"><i data-lucide="message-square" class="w-4 h-4"></i><span class="text-xs">${tw.comments.length}</span></div>
+                            <div class="flex items-center gap-2 group"><i data-lucide="repeat" class="w-4 h-4"></i><span class="text-xs">${tw.rts}</span></div>
+                            <div class="flex items-center gap-2 group cursor-pointer" onclick="toggleLike(this.parentElement.parentElement)">
+                                <i data-lucide="heart" class="w-4 h-4 tw-like-icon"></i><span class="text-xs tw-like-count">${tw.likes}</span>
+                            </div>
+                            <div class="flex items-center gap-2 group"><i data-lucide="bar-chart-2" class="w-4 h-4"></i><span class="text-xs">${tw.views}</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2 pl-12 border-t border-gray-800 pt-2">${commentsHtml}</div>
+                `;
+                list.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+
+        async function generateSocialPost() {
+            const agent = agents[currentAgentIdx];
+            const s = agent.slots[currentSlot];
+            const btn = document.querySelector('#mp-tweet .float-tweet-btn');
+            btn.style.opacity = '0.5';
+            
+            let url = document.getElementById('api-url').value;
+            const key = document.getElementById('api-key').value;
+            const model = document.getElementById('model-id').value;
+
+            const prompt = `User: Generate a social media post (Twitter style) based on character: ${agent.name}, persona: ${agent.persona}, and recent chat memory. 
+            Return JSON format: { "content": "post text", "image_desc": "photo description", "comments": [{"user":"fan","text":"comment"}] } (Max 3 comments)`;
+
+            let base = cleanBaseUrl(url);
+            let target = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions';
+            
+            try {
+                const res = await fetch(target, {
+                    method: 'POST',
+                    headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+                    body: JSON.stringify({ model: model, messages: [{role:'user', content: prompt}] })
+                });
+                const data = await res.json();
+                let result = data.choices[0].message.content;
+                result = result.replace(/```json/g, '').replace(/```/g, '');
+                const json = JSON.parse(result);
+                
+                json.likes = Math.floor(Math.random() * 5000) + 100;
+                json.rts = Math.floor(json.likes * 0.2);
+                json.views = (json.likes * 15 / 1000).toFixed(1) + 'k';
+                json.time = 'Just now';
+                
+                if(!s.tweets) s.tweets = [];
+                s.tweets.unshift(json);
+                if(s.tweets.length > 10) s.tweets.pop();
+                
+                renderTweets();
+
+            } catch(e) { alert("生成失败: " + e.message); }
+            btn.style.opacity = '1';
+        }
+
+        /* --- Google / Search History Logic --- */
+        function renderSearchHistory() {
+            const list = document.getElementById('browser-list-render');
+            list.innerHTML = '';
+            const sh = agents[currentAgentIdx].slots[currentSlot].searchHistory || [];
+
+            if(sh.length === 0) {
+                list.innerHTML = `<div style="padding:40px; text-align:center; color:#5f6368; font-size:0.9rem;">暂无搜索记录</div>`;
+                return;
+            }
+
+            const iconMap = {
+                search: { icon: 'search', bg: 'bg-blue-dark', text: 'text-blue-glow', meta: `已搜索 · Google.com` },
+                map: { icon: 'map-pin', bg: 'bg-purple-dark', text: 'text-purple-glow', meta: '在地图中查看过' },
+                shop: { icon: 'shopping-cart', bg: 'bg-green-dark', text: 'text-green-glow', meta: '已访问：shopping.google.com' }
+            };
+
+            sh.forEach(item => {
+                const conf = iconMap[item.type] || iconMap.search;
+                const row = document.createElement('div');
+                row.className = 'search-item';
+                row.innerHTML = `
+                    <div class="icon-circle ${conf.bg}">
+                        <i data-lucide="${conf.icon}" class="w-4 h-4 ${conf.text}"></i>
+                    </div>
+                    <div class="search-content">
+                        <div class="search-title">
+                            <span>${item.query}</span>
+                            <span class="search-time">${item.time}</span>
+                        </div>
+                        <div class="search-meta">${conf.meta}</div>
+                        <div class="ai-thought-box">
+                            <span>Ta的碎碎念：${item.thought}</span>
+                        </div>
+                    </div>
+                    <div style="color:#9aa0a6; cursor:pointer;" onclick="this.parentElement.remove()"><i data-lucide="x" class="w-4 h-4"></i></div>
+                `;
+                list.appendChild(row);
+            });
+            lucide.createIcons();
+        }
+
+        async function generateSearchHistory() {
+            const agent = agents[currentAgentIdx];
+            const s = agent.slots[currentSlot];
+            const btn = document.querySelector('#mp-google .float-tweet-btn');
+            btn.style.opacity = '0.5';
+
+            let url = document.getElementById('api-url').value;
+            const key = document.getElementById('api-key').value;
+            const model = document.getElementById('model-id').value;
+
+            const prompt = `User: Generate ONE fake browser search query based on character: ${agent.name}, persona: ${agent.persona}, and recent chat memory. 
+            Randomly choose type: "search", "map", or "shop".
+            Return JSON format: { "type": "search/map/shop", "query": "search text", "thought": "short witty inner monologue" }`;
+
+            let base = cleanBaseUrl(url);
+            let target = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions';
+
+            try {
+                const res = await fetch(target, {
+                    method: 'POST',
+                    headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [{role:'user', content: prompt}],
+                        response_format: { type: "json_object" } 
+                    })
+                });
+                const data = await res.json();
+                let result = data.choices[0].message.content;
+                result = result.replace(/```json/g, '').replace(/```/g, '');
+                const json = JSON.parse(result);
+
+                const now = new Date();
+                json.time = `${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}`;
+
+                if(!s.searchHistory) s.searchHistory = [];
+                s.searchHistory.unshift(json); 
+                if(s.searchHistory.length > 10) s.searchHistory.pop();
+                renderSearchHistory();
+
+            } catch(e) { alert("生成搜索记录失败: " + e.message); }
+            btn.style.opacity = '1';
+        }
+
+        /* --- Summon Logic --- */
+        async function generateSummon() {
+            const agent = agents[currentAgentIdx];
+            const s = agent.slots[currentSlot];
+            const btn = document.querySelector('#mp-summon .float-tweet-btn');
+            btn.style.opacity = '0.5';
+
+            let url = document.getElementById('api-url').value;
+            const key = document.getElementById('api-key').value;
+            const model = document.getElementById('model-id').value;
+
+            const prompt = `User: Based on the "Linked Characters" defined as: [${agent.relation}], and the current chat memory: [${s.memory}], generate a short dialogue or action scene involving THESE linked characters. 
+            The main character (${agent.name}) might be mentioned but is NOT the speaker. 
+            Output ONLY the scene text (e.g. "Butler: The master is looking for you."). Keep it short and impactful.`;
+
+            let base = cleanBaseUrl(url);
+            let target = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions';
+
+            try {
+                const res = await fetch(target, {
+                    method: 'POST',
+                    headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [{role:'user', content: prompt}]
+                    })
+                });
+                const data = await res.json();
+                let result = data.choices[0].message.content;
+                
+                tempSummonContext = result; // Store for next LLM turn
+                document.getElementById('summon-output').innerText = result;
+
+            } catch(e) { alert("召唤失败: " + e.message); }
+            btn.style.opacity = '1';
+        }
+
+        /* --- Taobao Logic --- */
+        async function generateTaobaoOrder() {
+            const agent = agents[currentAgentIdx];
+            const btn = document.querySelector('#mp-taobao .float-tweet-btn');
+            btn.style.opacity = '0.5';
+
+            let url = document.getElementById('api-url').value;
+            const key = document.getElementById('api-key').value;
+            const model = document.getElementById('model-id').value;
+
+            const prompt = `User: Generate ONE fake Taobao shopping order based on character: ${agent.name}, persona: ${agent.persona}, and recent chat memory.
+            Return JSON format: { "itemName": "Creative product name", "price": "e.g. 299.00", "type": "shirt/gift/food/gadget", "comment": "Ta's secret thought about buying this" }`;
+
+            let base = cleanBaseUrl(url);
+            let target = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions';
+
+            try {
+                const res = await fetch(target, {
+                    method: 'POST',
+                    headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [{role:'user', content: prompt}],
+                        response_format: { type: "json_object" } 
+                    })
+                });
+                const data = await res.json();
+                let result = data.choices[0].message.content;
+                result = result.replace(/```json/g, '').replace(/```/g, '');
+                const json = JSON.parse(result);
+
+                const list = document.getElementById('tb-list-render');
+                // Remove placeholder if exists
+                if(list.innerText.includes('暂无新订单')) list.innerHTML = '';
+
+                // Increment Badge (Dynamic Logic)
+                const badge = document.getElementById('tb-badge');
+                let count = parseInt(badge.innerText) || 0;
+                count++;
+                badge.innerText = count;
+                badge.style.display = 'block';
+
+                // Icon mapping
+                let icon = 'package';
+                if(json.type.includes('shirt') || json.type.includes('cloth')) icon = 'shirt';
+                else if(json.type.includes('food')) icon = 'utensils';
+                else if(json.type.includes('gift')) icon = 'gift';
+                else if(json.type.includes('gadget')) icon = 'gamepad-2';
+
+                const html = `
+                <div class="order-card p-4 shadow-sm border-2 border-orange-100 animate-pulse">
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="flex items-center gap-2 font-bold text-sm">
+                            <i data-lucide="shopping-bag" class="w-4 h-4 text-gray-400"></i>
+                            官方旗舰店 >
+                        </div>
+                        <span class="status-tag">等待发货</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <div class="w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center border border-gray-100">
+                            <i data-lucide="${icon}" class="w-8 h-8 text-gray-300"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h2 class="text-sm line-clamp-2 font-bold">${json.itemName}</h2>
+                            <p class="text-xs text-gray-400 mt-1">7天无理由退换</p>
+                            <div class="flex justify-between items-end mt-2">
+                                <span class="font-bold">¥ ${json.price}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-dashed border-gray-200 flex items-start gap-2">
+                       <span class="text-xs bg-orange-100 text-tb-orange px-1.5 py-0.5 rounded">Ta的碎碎念</span>
+                       <p class="text-xs text-gray-500 italic">"${json.comment}"</p>
+                    </div>
+                </div>
+                `;
+                list.insertAdjacentHTML('afterbegin', html);
+                lucide.createIcons();
+
+            } catch(e) { alert("生成订单失败: " + e.message); }
+            btn.style.opacity = '1';
+        }
+
+        function toggleMoreDrawer(forceOpen) {
+            const p = document.getElementById('more-panel');
+            if(forceOpen === true) p.classList.add('open');
+            else if(forceOpen === false) p.classList.remove('open');
+            else p.classList.toggle('open');
+            lucide.createIcons();
+        }
+
+        function saveGlobalSettings() {
+            const s = localStorage;
+            s.setItem('m6_name', document.getElementById('my-name').value);
+            s.setItem('m6_url', document.getElementById('api-url').value);
+            s.setItem('m6_key', document.getElementById('api-key').value);
+            s.setItem('m6_model', document.getElementById('model-id').value);
+            s.setItem('m6_mmg', document.getElementById('mm-group').value);
+            s.setItem('m6_mmk', document.getElementById('mm-key').value);
+            const btn = document.querySelector('.btn-save');
+            btn.innerText = "已保存"; btn.style.background = "#27ae60";
+            setTimeout(()=>{ btn.innerText="保存设置"; btn.style.background="#2c3e50"; },1500);
+        }
+        
+        function loadSettings() {
+            const s = localStorage;
+            if(s.getItem('m6_name')) document.getElementById('my-name').value = s.getItem('m6_name');
+            if(s.getItem('m6_url')) document.getElementById('api-url').value = s.getItem('m6_url');
+            if(s.getItem('m6_key')) document.getElementById('api-key').value = s.getItem('m6_key');
+            if(s.getItem('m6_model')) document.getElementById('model-id').value = s.getItem('m6_model');
+            if(s.getItem('m6_mmg')) document.getElementById('mm-group').value = s.getItem('m6_mmg');
+            if(s.getItem('m6_mmk')) document.getElementById('mm-key').value = s.getItem('m6_mmk');
+        }
+        
+        // 页面加载完成后初始化美化中心
+        window.addEventListener('DOMContentLoaded', function() {
+            // 如果用户已经进入应用，渲染美化中心
+            if (document.getElementById('cover-page').style.display === 'none') {
+                renderMall();
+            }
+        });
+    </script>
 </body>
 </html>
